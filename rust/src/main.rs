@@ -1,4 +1,9 @@
+use candle_core::Device;
 use tokenizers::tokenizer::{Result, Tokenizer};
+mod embeddings;
+use embeddings::input_embeddings::InputEmbeddings;
+
+const D_MODEL: usize = 512;
 
 fn main() -> Result<()> {
     let tokenizer = Tokenizer::from_pretrained("bert-base-cased", None)?;
@@ -6,6 +11,11 @@ fn main() -> Result<()> {
 
     println!("tokens: {:?}", encoding.get_tokens());
     println!("ids: {:?}", encoding.get_ids());
+
+    let vocab_size = tokenizer.get_vocab_size(true);
+    let device = Device::Cpu;
+
+    let input_embeddings = InputEmbeddings(vocab_size, D_MODEL, &device);
 
     Ok(())
 }
