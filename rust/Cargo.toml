@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-candle-core = { version = "0.8.2"} #, features = ["cuda"] }
-candle-nn = "0.8.2"
+candle-core = { version = "0.8.2", features = ["cuda"] } #, features = ["cuda"] }
+candle-nn = { version = "0.8.2", features = ["cuda"] }
 tokenizers = { version = "0.21.0", features = ["http"] }

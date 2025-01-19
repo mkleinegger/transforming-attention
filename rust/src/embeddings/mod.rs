@@ -1,2 +1,2 @@
 pub mod input_embeddings;
-pub mod pos_embeddings;
+pub mod positional_embeddings;
