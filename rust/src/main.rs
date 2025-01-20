@@ -1,8 +1,7 @@
-mod embeddings;
-
-use crate::embeddings::input_embeddings::InputEmbeddings;
-use crate::embeddings::positional_embeddings::PositionalEmbeddings;
 use candle_core::{Device, IndexOp};
+use ta::embeddings::input_embeddings::InputEmbeddings;
+use ta::embeddings::positional_embeddings::PositionalEmbeddings;
+
 use candle_nn::Dropout;
 use tokenizers::tokenizer::{Result, Tokenizer};
 
@@ -16,7 +15,7 @@ fn main() -> Result<()> {
     println!("ids: {:?}", encoding.get_ids());
 
     let vocab_size = tokenizer.get_vocab_size(true);
-    let device = Device::new_cuda(0)?;
+    let device = Device::cuda_if_available(0)?;
 
     let token_ids = encoding.get_ids();
 

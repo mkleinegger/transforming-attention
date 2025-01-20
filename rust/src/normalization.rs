@@ -1,0 +1,22 @@
+use candle_core::{Device, Result, Tensor};
+use candle_nn::{LayerNorm, Module};
+
+#[derive(Clone, Debug)]
+pub struct NormalizationLayer(LayerNorm);
+
+/// Normalize a vector as described in the paper using `LayerNorm`
+/// from candle. We wrap around that implementation to set the values
+/// as described in the paper and then call the LayerNorm implementation.
+impl NormalizationLayer {
+    pub fn new(device: &Device) -> Result<Self> {
+        let omega = Tensor::new(1f32, device)?;
+        let beta = Tensor::new(0f32, device)?;
+        let layer = LayerNorm::new(omega, beta, 1e-5);
+        Ok(Self(layer))
+    }
+
+    // Normalize `tensor` as descriced in the paper
+    pub fn forward(&self, tensor: &Tensor) -> Result<Tensor> {
+        self.0.forward(tensor)
+    }
+}
