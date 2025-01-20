@@ -11,15 +11,17 @@ pub struct PositionalEmbeddings {
 impl PositionalEmbeddings {
     pub fn new(seq_len: usize, d_model: usize, dropout: Dropout, device: &Device) -> Result<Self> {
         let positions = Tensor::arange(0f32, seq_len as f32, device)?;
-        let denom = ((Tensor::arange(0f32, d_model as f32, device)?
-            * (-10_000.0f64.ln() / d_model as f64))?)
+        let denom = ((Tensor::arange_step(0f32, d_model as f32, 2f32, device)?
+            * (-(10_000.0f64.ln()) / d_model as f64))?)
             .exp()?;
+
+        let pe = Tensor::zeros((seq_len, d_model), candle_core::DType::F64, device)?;
 
         let expanded_positions = positions.unsqueeze(1)?;
         let expanded_denom = denom.unsqueeze(0)?;
 
         let product = (expanded_positions.matmul(&expanded_denom))?;
-        println!("Positional Product: {}", product);
+        println!("Positional Product: {:?}", product);
 
         let embeddings_even = product.sin()?;
         let embeddings_odd = product.cos()?;

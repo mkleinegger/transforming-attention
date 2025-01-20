@@ -1,6 +1,3 @@
-use hf_hub::api::sync::Api;
-use polars::prelude::*;
-
 use ta::data::HuggingfaceDataset;
 
 fn main() {
