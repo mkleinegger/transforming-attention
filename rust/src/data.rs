@@ -1,3 +1,4 @@
+use candle_core::Result;
 use std::{fs::File, path::PathBuf};
 
 use candle_hf_hub::api::sync::Api;
@@ -11,7 +12,7 @@ pub struct HuggingfaceDataset {
 }
 
 impl HuggingfaceDataset {
-    pub fn new(dataset: &str) -> Self {
+    pub fn new(dataset: &str) -> Result<Self> {
         let api = Api::new().unwrap();
         let repo = api.dataset(String::from("wmt/wmt14"));
         let data = repo.info();
@@ -34,23 +35,26 @@ impl HuggingfaceDataset {
             }
         }
 
-        let train_frames: Vec<LazyFrame> =
-            train_files.iter().map(|path| Self::load(path)).collect();
+        // TODO: implement proper error handling of loaded LazyFrames
+        let train_frames: Vec<LazyFrame> = train_files
+            .iter()
+            .map(|path| Self::load(path).unwrap())
+            .collect();
         let train = concat(train_frames, UnionArgs::default()).unwrap();
 
-        let test = Self::load(&test_file.unwrap());
-        let validation = Self::load(&validation_file.unwrap());
+        let test = Self::load(&test_file.unwrap()).unwrap();
+        let validation = Self::load(&validation_file.unwrap()).unwrap();
         let dataset = String::from(dataset);
 
-        Self {
+        Ok(Self {
             dataset,
             test,
             validation,
             train,
-        }
+        })
     }
 
-    fn load(path: &PathBuf) -> LazyFrame {
+    fn load(path: &PathBuf) -> PolarsResult<LazyFrame> {
         // LazyFrame::scan_parquet(
         //     "hf://datasets/wmt/wmt14/de-en/test-00000-of-00001.parquet",
         //     Default::default(),
@@ -60,7 +64,6 @@ impl HuggingfaceDataset {
             // "/home/lukas/Programming/uni/transforming-attention/rust/resource/validation*.parquet",
             Default::default(),
         )
-        .unwrap()
     }
 }
 

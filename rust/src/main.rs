@@ -1,20 +1,21 @@
-use candle_core::{Device, IndexOp, Tensor};
-use ta::embeddings::input_embeddings::InputEmbeddings;
+use candle_core::{DType, Device, IndexOp, Tensor};
 use ta::embeddings::positional_embeddings::PositionalEmbeddings;
+use ta::{config::Config, embeddings::input_embeddings::InputEmbeddings};
 
-use candle_nn::Dropout;
+use candle_nn::{Dropout, VarBuilder};
 use tokenizers::tokenizer::{Result, Tokenizer};
-
-const D_MODEL: usize = 512;
-const N_ENCODERS: usize = 6;
-const N_DECODERS: usize = 6;
 
 fn main() -> Result<()> {
     let tokenizer = Tokenizer::from_pretrained("bert-base-cased", None)?;
 
+    let config = Config::default();
+
     let vocab_size = tokenizer.get_vocab_size(true);
     let device = Device::cuda_if_available(0)?;
     println!("Using GPU: {:?}", !device.is_cpu());
+
+    let varmap = VarMap::new();
+    let vb = VarBuilder::from_varmap(&varmap, DType::F64, dev);
 
     // Load Data & Encode directly
     let encoding = tokenizer.encode("Hello Tokenizer! How are you?", true)?;

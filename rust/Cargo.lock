@@ -3758,6 +3758,7 @@ dependencies = [
  "candle-nn",
  "polars",
  "tokenizers 0.21.0",
+ "tracing",
 ]
 
 [[package]]

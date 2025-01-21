@@ -10,6 +10,7 @@ candle-hf-hub = "0.3.3"
 candle-nn = { version = "0.8.2", features = ["cuda"] }
 polars = { version = "0.45.1", features = ["cloud", "dtype-struct", "lazy", "parquet"] }
 tokenizers = { version = "0.21.0", features = ["http"] }
+tracing = "0.1.41"
 
 [[bin]]
 name = "data"

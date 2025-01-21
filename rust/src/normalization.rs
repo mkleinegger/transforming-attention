@@ -1,6 +1,8 @@
 use candle_core::{Device, Result, Tensor};
 use candle_nn::{LayerNorm, Module};
 
+use crate::config::Config;
+
 #[derive(Clone, Debug)]
 pub struct NormalizationLayer(LayerNorm);
 
@@ -8,9 +10,9 @@ pub struct NormalizationLayer(LayerNorm);
 /// from candle. We wrap around that implementation to set the values
 /// as described in the paper and then call the LayerNorm implementation.
 impl NormalizationLayer {
-    pub fn new(device: &Device) -> Result<Self> {
-        let omega = Tensor::new(1f32, device)?;
-        let beta = Tensor::new(0f32, device)?;
+    pub fn new(config: &Config) -> Result<Self> {
+        let omega = Tensor::new(1f32, &config.device)?;
+        let beta = Tensor::new(0f32, &config.device)?;
         let layer = LayerNorm::new(omega, beta, 1e-5);
         Ok(Self(layer))
     }
