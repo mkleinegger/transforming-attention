@@ -1,0 +1,9 @@
+name: t2t
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=2.7.12
+  - ipykernel
+  - cudatoolkit=9.0
+  - tensorflow-gpu==1.8.0

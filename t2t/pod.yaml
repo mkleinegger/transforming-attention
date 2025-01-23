@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: t2t
+  labels:
+    app: t2t
+spec:
+  nodeSelector:
+    capi.stackhpc.com/node-group: gpu-workers-t4
+  containers:
+  - name: t2t
+    image: bitspeech/tensor2tensor:1.7.0-gpu
+    resources:
+      limits:
+        nvidia.com/gpu: 8
+    command: ["bash"]
+    args: ["-c", "sleep infinity"]

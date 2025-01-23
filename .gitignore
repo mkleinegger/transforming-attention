@@ -1,3 +1,6 @@
+# custom
+t2t/results/
+translate_ende_medium.parquet
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
