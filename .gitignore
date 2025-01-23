@@ -171,3 +171,4 @@ cython_debug/
 .pypirc
 .attention-is-all-you-need
 resource
+tmp
