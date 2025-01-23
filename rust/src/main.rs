@@ -1,8 +1,10 @@
+use std::path::Path;
+
 use candle_core::{DType, Device, IndexOp, Tensor};
 use ta::embeddings::positional_embeddings::PositionalEmbeddings;
 use ta::{config::Config, embeddings::input_embeddings::InputEmbeddings};
 
-use candle_nn::{Dropout, VarBuilder};
+use candle_nn::{Dropout, VarBuilder, VarMap};
 use tokenizers::tokenizer::{Result, Tokenizer};
 
 fn main() -> Result<()> {
@@ -15,7 +17,7 @@ fn main() -> Result<()> {
     println!("Using GPU: {:?}", !device.is_cpu());
 
     let varmap = VarMap::new();
-    let vb = VarBuilder::from_varmap(&varmap, DType::F64, dev);
+    let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
     // Load Data & Encode directly
     let encoding = tokenizer.encode("Hello Tokenizer! How are you?", true)?;
@@ -41,16 +43,26 @@ fn main() -> Result<()> {
     println!("tokens: {:?}", encoding.get_tokens());
     println!("ids: {:?}", encoding.get_ids());
 
-    let input_embeddings = InputEmbeddings::new(vocab_size, D_MODEL, &device)?;
+    let input_embeddings =
+        InputEmbeddings::new(vocab_size, &config, vb.pp("input_embeddings"), &device)?;
     let word_embeddings = input_embeddings.forward(&token_ids, &device)?;
-    println!("word embeddings: {word_embeddings:?}");
+    println!("word embeddings: {word_embeddings}");
 
-    let mut positional_embeddings =
-        PositionalEmbeddings::new(8, D_MODEL, Dropout::new(0.3), &device)?;
+    let mut positional_embeddings = PositionalEmbeddings::new(&config, &device)?;
     let encoder_input = positional_embeddings.forward(word_embeddings.i(..8)?)?;
 
     println!("encoder input: {encoder_input}");
     // TODO: Create Encoders & Decoders
+
+    let save_path = Path::new("/home/lukas/Programming/uni/transforming-attention/rust/tmp/weights");
+    println!("Saving weights at {}", save_path.display());
+    varmap.save(save_path)?;
+
+    let loaded = candle_core::safetensors::load(save_path, &device)?;
+    // let loaded_varmap = VarBuilder::from_mmaped_safetensors(save_path, DType::F32, &device);
+    // let loaded_vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
+    println!("loaded: {:?}", loaded);
+
 
     Ok(())
 }
