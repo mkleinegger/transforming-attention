@@ -15,3 +15,7 @@ tracing = "0.1.41"
 [[bin]]
 name = "data"
 path = "src/bin/data.rs"
+
+[[bin]]
+name = "manual"
+path = "src/bin/manual.rs"

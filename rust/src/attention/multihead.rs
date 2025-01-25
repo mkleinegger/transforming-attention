@@ -1,11 +1,12 @@
 use candle_core::{Device, Result, Tensor};
-use candle_nn::{linear, Dropout, Linear, Module, VarBuilder};
+use candle_nn::{linear, ops::softmax, Dropout, Linear, Module, VarBuilder};
 
 use crate::config::Config;
 
-pub struct MultiHeadAttention {
+pub struct MultiHeadAttentionBlock {
     n_heads: usize,
     d_model: usize,
+    head_size: usize,
     dropout: Dropout,
     wq: Linear,
     wk: Linear,
@@ -13,8 +14,8 @@ pub struct MultiHeadAttention {
     wo: Linear,
 }
 
-impl MultiHeadAttention {
-    pub fn new(vb: VarBuilder, config: &Config) -> Result<MultiHeadAttention> {
+impl MultiHeadAttentionBlock {
+    pub fn new(vb: VarBuilder, config: &Config) -> Result<MultiHeadAttentionBlock> {
         let wq = linear(config.d_model, config.d_model, vb.pp("wq"))?;
         let wk = linear(config.d_model, config.d_model, vb.pp("wk"))?;
         let wv = linear(config.d_model, config.d_model, vb.pp("wv"))?;
@@ -27,6 +28,7 @@ impl MultiHeadAttention {
         Ok(Self {
             n_heads: config.n_heads,
             d_model: config.d_model,
+            head_size: config.d_model / config.n_heads,
             dropout,
             wq,
             wk,
@@ -71,8 +73,7 @@ impl MultiHeadAttention {
             seq_len,
             self.d_model,
         ))?;
-
-        Ok((self.wo.forward(&res))?)
+        self.wo.forward(&res)
     }
 
     fn compute_attention_scores(
@@ -82,7 +83,27 @@ impl MultiHeadAttention {
         value: Tensor,
         mask: Option<Tensor>,
     ) -> Result<(Tensor, Tensor)> {
-        todo!("Implement attention scores")
+        let divisor = Tensor::new((self.head_size as f32).sqrt(), query.device())?;
+        let mut attention_scores = query
+            .contiguous()?
+            .matmul(&key.t()?.contiguous()?)?
+            .broadcast_div(&divisor)?;
+
+        attention_scores = match mask {
+            Some(m) => masked_fill(
+                &attention_scores,
+                &m.broadcast_left((query.dim(0)?, self.n_heads))?,
+                f32::NEG_INFINITY,
+            )?,
+            None => attention_scores,
+        };
+
+        let last_dim = attention_scores.dims().len();
+        attention_scores = softmax(&attention_scores, last_dim - 1)?; // last_dim should be 4
+        let final_scores = attention_scores
+            .contiguous()?
+            .matmul(&value.contiguous()?)?;
+        Ok((final_scores, attention_scores))
     }
 }
 
@@ -92,4 +113,11 @@ fn get_mask(size: usize, device: &Device) -> Result<Tensor> {
         .collect();
 
     Tensor::from_slice(&mask, (size, size), device)
+}
+
+fn masked_fill(on_false: &Tensor, mask: &Tensor, on_true: f32) -> Result<Tensor> {
+    let shape = mask.shape();
+    let on_true = Tensor::new(on_true, on_false.device())?.broadcast_as(shape.dims())?;
+    let m = mask.where_cond(&on_true, on_false)?;
+    Ok(m)
 }

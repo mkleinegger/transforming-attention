@@ -13,16 +13,14 @@ pub struct PositionalEmbeddings {
 impl PositionalEmbeddings {
     pub fn new(config: &Config, device: &Device) -> Result<Self> {
         let positions = Tensor::arange(0f32, config.seq_len as f32, device)?;
-        let denom = ((Tensor::arange_step(0f32, config.d_model as f32, 1f32, device)?
+        let denom = ((Tensor::arange_step(0f32, config.d_model as f32, 2f32, device)?
             * (-(10_000.0f64.ln()) / config.d_model as f64))?)
             .exp()?;
 
-        // let pe = Tensor::zeros((seq_len, d_model), candle_core::DType::F64, device)?;
+        let expanded_positions = positions.unsqueeze(1)?; // (seq_len, 1)
+        let expanded_denom = denom.unsqueeze(0)?; // (1, d_model / 2)
 
-        let expanded_positions = positions.unsqueeze(1)?;
-        let expanded_denom = denom.unsqueeze(0)?;
-
-        let product = (expanded_positions.matmul(&expanded_denom))?;
+        let product = (expanded_positions.matmul(&expanded_denom))?; // (seq_len, d_model)
         println!("Positional Product: {:?}", product);
 
         let embeddings_even = product.sin()?;
@@ -30,7 +28,7 @@ impl PositionalEmbeddings {
 
         // TODO: find better way to initialize Tensor instead of loop unrolling
         let col_first_even = embeddings_even.get_on_dim(1, 0)?;
-        let col_first_odd = embeddings_odd.get_on_dim(1, 0)?;
+        let col_first_odd = embeddings_odd.get_on_dim(1, 1)?;
         let mut positional_embeddings: Tensor = Tensor::cat(&[&col_first_even, &col_first_odd], 0)?;
 
         // iterate over all values in d_model and apply positional embeddings
@@ -42,10 +40,11 @@ impl PositionalEmbeddings {
             positional_embeddings = Tensor::cat(&[&positional_embeddings, &col_odd], 0)?;
         }
 
+        // (1, seq_len, d_model)
         positional_embeddings = positional_embeddings
             .reshape((config.d_model, config.seq_len))?
-            .transpose(0, 1)?
-            .unsqueeze(0)?;
+            .transpose(0, 1)?;
+        println!("Positional Embeddings: {}", positional_embeddings);
 
         Ok(PositionalEmbeddings {
             positional_embeddings,
@@ -55,8 +54,19 @@ impl PositionalEmbeddings {
         })
     }
 
+    /// Apply positional embeddings to input tensor of shape (batch, seq_len, n_model)
+    /// to each batch.
     pub fn forward(&mut self, tensor: Tensor) -> Result<Tensor> {
-        let result = (&self.positional_embeddings.i(0)? + tensor)?;
+        // TODO: find good way to calculate positional embeddings without separate resizing
+        let positional_batches: Vec<Tensor> = Vec::with_capacity(tensor.dim(0)?);
+        for i in 0..tensor.dim(0)? {
+            let narrowed = self // ( seq_len, n_model)
+                .positional_embeddings
+                .i(i)?
+                .narrow(0, 0, tensor.dim(1)?)?;
+            positional_batches.push(narrowed + tensor.i(i)?)?;
+        }
+        let result = (&self.positional_embeddings + tensor)?;
         self.positional_embeddings = result.unsqueeze(0)?;
         self.dropout.forward(&self.positional_embeddings, false)
     }
@@ -81,30 +91,34 @@ mod tests {
     }
 
     #[test]
-    fn test_pos_embeddings_forward() {
+    fn test_pos_embeddings_forward() -> Result<()> {
         let device = Device::cuda_if_available(0).unwrap();
         let tokenizer = Tokenizer::from_pretrained("bert-base-cased", None).unwrap();
         let config = Config::default();
         let varmap = VarMap::new();
         let vb = VarBuilder::from_varmap(&varmap, candle_core::DType::F32, &device);
 
-        let encoding = tokenizer
-            .encode(("Welcome to the library. ", "test this out"), true)
-            .unwrap();
-        println!("tok:  {:?}", encoding.get_tokens());
-        // tok:  ["welcome", "to", "the", "library", ".", "test", "this", "out"]
-        println!("ids:  {:?}", encoding.get_ids());
-        // ids:  [5807, 11, 5, 1509, 7, 681, 48, 92]
-
+        let sentences = ["The black cat sits outside", "A man is playing guitar"];
+        let encodings_batch = tokenizer.encode_batch(sentences.to_vec(), true).unwrap();
+        let token_ids_batch = encodings_batch
+            .iter()
+            .map(|tokens| {
+                let tokens = tokens.get_ids().to_vec();
+                Ok(Tensor::new(tokens.as_slice(), &device)?)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let token_ids_batch = Tensor::stack(&token_ids_batch, 0)?; // shape: (2, 7)
         let vocab_size = tokenizer.get_vocab_size(true);
-        let token_ids = encoding.get_ids();
+        println!("Token Ids: {}", token_ids_batch);
 
-        let input_embeds = InputEmbeddings::new(vocab_size, &config, vb, &device).unwrap();
-        let embeddings = input_embeds.forward(&token_ids, &device).unwrap();
+        let input_embeds = InputEmbeddings::new(vocab_size, &config, vb)?;
+        let embeddings = input_embeds.forward(&token_ids_batch)?;
         println!("vector embeddings: \n{}\n", embeddings);
-        let mut pe = PositionalEmbeddings::new(&config, &device).unwrap();
+        let mut pe = PositionalEmbeddings::new(&config, &device)?;
         println!("pos_embeddings main: \n{}\n", pe.positional_embeddings);
-        let encoder_input = pe.forward(embeddings).unwrap();
+        let encoder_input = pe.forward(embeddings)?;
         println!("encoder_input: \n{}\n", encoder_input);
+
+        Ok(())
     }
 }

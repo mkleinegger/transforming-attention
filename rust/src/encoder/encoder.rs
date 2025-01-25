@@ -1,5 +1,3 @@
-// use ta::encoder::encoder_block::EncoderBlock;
-
 use crate::config::Config;
 use crate::encoder::encoder_block::EncoderBlock;
 use crate::normalization::NormalizationLayer;
@@ -15,10 +13,11 @@ pub struct Encoder {
 impl Encoder {
     pub fn new(vb: VarBuilder, config: &Config) -> Result<Self> {
         let norm = NormalizationLayer::new(config)?;
-        let layers = (0..config.n_decoders)
+        let layers = (0..config.n_encoders)
             .map(|index| EncoderBlock::new(vb.pp(format!("encoder.{index}")), config))
             .collect::<Result<Vec<_>>>()?;
 
+        // TODO: add logging using tracing crate
         let span = tracing::span!(tracing::Level::TRACE, "encoder");
         Ok(Self { layers, norm })
     }

@@ -7,32 +7,28 @@ use crate::config::Config;
 pub struct InputEmbeddings {
     d_model: usize,
     embedding: Embedding,
+    tensor_standardization: Tensor,
 }
 
 impl InputEmbeddings {
-    pub fn new(vocab_size: usize, config: &Config, vb: VarBuilder, device: &Device) -> Result<Self> {
-        // let mut map = HashMap::new();
-        // map.insert(
-        //     String::from("weight"),
-        //     Tensor::randn(0f32, 1., (vocab_size, d_model), &device)?,
-        // );
-        //
-        // let var_builder = VarBuilder::from_tensors(map, candle_core::DType::F32, &device);
+    pub fn new(vocab_size: usize, config: &Config, vb: VarBuilder) -> Result<Self> {
+        let tensor_standardization = Tensor::new((config.d_model as f32).sqrt(), vb.device())?;
         let embedding = embedding(vocab_size, config.d_model, vb)?;
 
         Ok(Self {
             d_model: config.d_model,
             embedding,
+            tensor_standardization,
         })
     }
 
-    pub fn forward(&self, indices: &[u32], device: &Device) -> Result<Tensor> {
-        let tensor = Tensor::from_slice(indices, (indices.len(),), device)?;
-        let dmodel_sqrt = (self.d_model as f32).sqrt();
-        let tensor_standardization = Tensor::new(dmodel_sqrt, device)?;
+    /// Get indices of shape (batch, seq_len) and add embedding vectors
+    /// resulting in shape (batch, seq_len, n_model)
+    pub fn forward(&self, indices: &Tensor) -> Result<Tensor> {
+        // let tensor = Tensor::from_slice(indices, (indices.len(),), device)?;
 
         self.embedding
-            .forward(&tensor)?
-            .broadcast_mul(&tensor_standardization)
+            .forward(indices)?
+            .broadcast_mul(&self.tensor_standardization)
     }
 }

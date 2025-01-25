@@ -9,7 +9,9 @@ use tokenizers::tokenizer::{Result, Tokenizer};
 
 fn main() -> Result<()> {
     let tokenizer = Tokenizer::from_pretrained("bert-base-cased", None)?;
+
     let config = Config::default();
+
     let vocab_size = tokenizer.get_vocab_size(true);
     println!("Tokenizer uses vocab of size: {:?}", vocab_size);
     let device = Device::cuda_if_available(0)?;
@@ -39,6 +41,10 @@ fn main() -> Result<()> {
         })
         .collect::<Result<Vec<_>>>()?;
     let token_ids_batch = Tensor::stack(&token_ids_batch, 0)?;
+
+    // let token_ids = encoding.get_ids();
+    // println!("tokens: {:?}", encoding.get_tokens());
+    // println!("ids: {:?}", encoding.get_ids());
     println!("Token ids: {}", token_ids_batch);
 
     let input_embeddings = InputEmbeddings::new(vocab_size, &config, vb.pp("input_embeddings"))?;
@@ -46,9 +52,10 @@ fn main() -> Result<()> {
     println!("word embeddings: {word_embeddings}");
 
     let mut positional_embeddings = PositionalEmbeddings::new(&config, &device)?;
-    let encoder_input = positional_embeddings.forward(word_embeddings.i(..8)?)?;
+    let encoder_input = positional_embeddings.forward(word_embeddings)?;
 
     println!("encoder input: {encoder_input}");
+    // TODO: Create Encoders & Decoders
 
     let save_path =
         Path::new("/home/lukas/Programming/uni/transforming-attention/rust/tmp/weights");
