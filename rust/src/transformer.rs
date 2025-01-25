@@ -45,9 +45,12 @@ impl Transformer {
     /// Encode indices of shape (batch, seq_len), by creating embeddings, doing positional
     /// encoding and passing it to an encoder, resulting in an encoded tensor of shape
     /// (batch, seq_len, d_model).
-    pub fn encode(&mut self, indices: &Tensor, src_mask: bool) -> Result<Tensor> {
+    pub fn encode(&mut self, indices: &Tensor, src_mask: bool, train: bool) -> Result<Tensor> {
+        println!("Encoder input: {}", indices);
         let embedded = self.encode_embeddings.forward(indices)?;
-        let embedded = self.encode_positional.forward(embedded)?;
+        println!("word embeddings: {}", embedded);
+        let embedded = self.encode_positional.forward(embedded, train)?;
+        println!("Transformer.encode: input to encoder: {}", embedded);
         self.encoder.forward(embedded, src_mask)
     }
 
@@ -59,9 +62,10 @@ impl Transformer {
         encoder_output: &Tensor,
         src_mask: bool,
         tgt_mask: bool,
+        train: bool
     ) -> Result<Tensor> {
         let embedded = self.decode_embeddings.forward(indices)?;
-        let embedded = self.decode_positional.forward(embedded)?;
+        let embedded = self.decode_positional.forward(embedded, train)?;
 
         self.decoder
             .forward(embedded, encoder_output, tgt_mask, src_mask)

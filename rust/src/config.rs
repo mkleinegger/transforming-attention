@@ -21,7 +21,7 @@ impl Default for Config {
         Self {
             n_encoders: 6,
             n_decoders: 6,
-            n_heads: 6,
+            n_heads: 8,
             d_model: 512,
             d_feed_forward: 2048,
             device,
@@ -29,7 +29,7 @@ impl Default for Config {
             pos_dropout: 0.3,
             residual_dropout: 0.3,
             feed_forward_dropout: 0.3,
-            seq_len: 8,
+            seq_len: 128,
         }
     }
 }

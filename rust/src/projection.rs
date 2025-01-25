@@ -16,7 +16,10 @@ impl ProjectionLayer {
     }
 
     pub fn forward(&self, xs: &Tensor) -> Result<Tensor> {
-        let probs = self.0.forward(xs)?;
-        log_softmax(&probs, probs.dims().len())
+        // (batch, seq_len, n_model)
+        println!("Projection input: {}", xs);
+        let probs = self.0.forward(xs)?; // (batch, seq_len, vocab_size)
+        println!("Projection probs: {}", probs);
+        log_softmax(&probs, 2) // (batch, seq_len, vocab_size)
     }
 }

@@ -13,7 +13,7 @@ pub struct PositionalEmbeddings {
 impl PositionalEmbeddings {
     pub fn new(config: &Config, device: &Device) -> Result<Self> {
         let positions = Tensor::arange(0f32, config.seq_len as f32, device)?;
-        let denom = ((Tensor::arange_step(0f32, config.d_model as f32, 2f32, device)?
+        let denom = ((Tensor::arange_step(0f32, config.d_model as f32, 1f32, device)?
             * (-(10_000.0f64.ln()) / config.d_model as f64))?)
             .exp()?;
 
@@ -56,19 +56,15 @@ impl PositionalEmbeddings {
 
     /// Apply positional embeddings to input tensor of shape (batch, seq_len, n_model)
     /// to each batch.
-    pub fn forward(&mut self, tensor: Tensor) -> Result<Tensor> {
-        // TODO: find good way to calculate positional embeddings without separate resizing
-        let positional_batches: Vec<Tensor> = Vec::with_capacity(tensor.dim(0)?);
-        for i in 0..tensor.dim(0)? {
-            let narrowed = self // ( seq_len, n_model)
-                .positional_embeddings
-                .i(i)?
-                .narrow(0, 0, tensor.dim(1)?)?;
-            positional_batches.push(narrowed + tensor.i(i)?)?;
-        }
-        let result = (&self.positional_embeddings + tensor)?;
-        self.positional_embeddings = result.unsqueeze(0)?;
-        self.dropout.forward(&self.positional_embeddings, false)
+    pub fn forward(&mut self, tensor: Tensor, train: bool) -> Result<Tensor> {
+        let result = (&self
+            .positional_embeddings
+            .narrow(0, 0, tensor.dim(1)?)?
+            .unsqueeze(0)?
+            .repeat((tensor.dim(0)?, 1, 1))?
+            + tensor)?;
+        // self.positional_embeddings = result.unsqueeze(0)?;
+        self.dropout.forward(&result, train)
     }
 }
 
@@ -116,7 +112,7 @@ mod tests {
         println!("vector embeddings: \n{}\n", embeddings);
         let mut pe = PositionalEmbeddings::new(&config, &device)?;
         println!("pos_embeddings main: \n{}\n", pe.positional_embeddings);
-        let encoder_input = pe.forward(embeddings)?;
+        let encoder_input = pe.forward(embeddings, false)?;
         println!("encoder_input: \n{}\n", encoder_input);
 
         Ok(())

@@ -52,10 +52,9 @@ fn main() -> Result<()> {
     println!("word embeddings: {word_embeddings}");
 
     let mut positional_embeddings = PositionalEmbeddings::new(&config, &device)?;
-    let encoder_input = positional_embeddings.forward(word_embeddings)?;
+    let encoder_input = positional_embeddings.forward(word_embeddings, false)?;
 
     println!("encoder input: {encoder_input}");
-    // TODO: Create Encoders & Decoders
 
     let save_path =
         Path::new("/home/lukas/Programming/uni/transforming-attention/rust/tmp/weights");
