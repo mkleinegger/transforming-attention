@@ -46,11 +46,8 @@ impl Transformer {
     /// encoding and passing it to an encoder, resulting in an encoded tensor of shape
     /// (batch, seq_len, d_model).
     pub fn encode(&mut self, indices: &Tensor, src_mask: bool, train: bool) -> Result<Tensor> {
-        println!("Encoder input: {}", indices);
         let embedded = self.encode_embeddings.forward(indices)?;
-        println!("word embeddings: {}", embedded);
         let embedded = self.encode_positional.forward(embedded, train)?;
-        println!("Transformer.encode: input to encoder: {}", embedded);
         self.encoder.forward(embedded, src_mask)
     }
 

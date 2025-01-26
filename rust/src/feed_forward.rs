@@ -15,8 +15,8 @@ impl FeedForwardBlock {
         // W2: [2048 * 512] and [2048]
 
         let layers = vec![
-            linear(config.d_model, config.d_feed_forward, vb.pp("linear0"))?,
-            linear(config.d_feed_forward, config.d_model, vb.pp("linear1"))?,
+            linear(config.d_model, config.d_feed_forward, vb.pp("0"))?,
+            linear(config.d_feed_forward, config.d_model, vb.pp("1"))?,
         ];
 
         Ok(Self {

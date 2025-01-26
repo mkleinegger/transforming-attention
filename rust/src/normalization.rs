@@ -19,7 +19,6 @@ impl NormalizationLayer {
 
     // Normalize `tensor` as descriced in the paper
     pub fn forward(&self, tensor: &Tensor) -> Result<Tensor> {
-        println!("Normalization input: {}", tensor);
         self.0.forward(tensor)
     }
 }

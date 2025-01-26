@@ -77,6 +77,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
+
+[[package]]
 name = "arbitrary"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -503,6 +509,17 @@ dependencies = [
  "safetensors",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "candle-optimisers"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b132b43a12cb3c6f40a57b8b13251a35e859c0760e861329c95d922689f0823a"
+dependencies = [
+ "candle-core",
+ "candle-nn",
+ "log",
 ]
 
 [[package]]
@@ -3752,10 +3769,12 @@ dependencies = [
 name = "ta"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "candle-core",
  "candle-datasets",
  "candle-hf-hub",
  "candle-nn",
+ "candle-optimisers",
  "polars",
  "tokenizers 0.21.0",
  "tracing",

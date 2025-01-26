@@ -21,7 +21,7 @@ impl PositionalEmbeddings {
         let expanded_denom = denom.unsqueeze(0)?; // (1, d_model / 2)
 
         let product = (expanded_positions.matmul(&expanded_denom))?; // (seq_len, d_model)
-        println!("Positional Product: {:?}", product);
+        // println!("Positional Product: {:?}", product);
 
         let embeddings_even = product.sin()?;
         let embeddings_odd = product.cos()?;
@@ -44,7 +44,7 @@ impl PositionalEmbeddings {
         positional_embeddings = positional_embeddings
             .reshape((config.d_model, config.seq_len))?
             .transpose(0, 1)?;
-        println!("Positional Embeddings: {}", positional_embeddings);
+        // println!("Positional Embeddings: {}", positional_embeddings);
 
         Ok(PositionalEmbeddings {
             positional_embeddings,

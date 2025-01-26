@@ -13,7 +13,7 @@ pub struct Decoder {
 impl Decoder {
     pub fn new(vb: VarBuilder, config: &Config) -> Result<Self> {
         let layers = (0..config.n_decoders)
-            .map(|index| DecoderBlock::new(config, vb.pp(format!("decoder.{index}"))))
+            .map(|index| DecoderBlock::new(config, vb.pp(format!("{index}"))))
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {

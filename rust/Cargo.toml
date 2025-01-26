@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.95"
 candle-core = { version = "0.8.2", features = ["cuda"] } #, features = ["cuda"] }
 candle-datasets = "0.8.2"
 candle-hf-hub = "0.3.3"
 candle-nn = { version = "0.8.2", features = ["cuda"] }
+candle-optimisers = "0.8.0"
 polars = { version = "0.45.1", features = ["cloud", "dtype-struct", "lazy", "parquet"] }
 tokenizers = { version = "0.21.0", features = ["http"] }
 tracing = "0.1.41"
@@ -19,3 +21,7 @@ path = "src/bin/data.rs"
 [[bin]]
 name = "manual"
 path = "src/bin/manual.rs"
+
+[[bin]]
+name = "train"
+path = "src/bin/train.rs"

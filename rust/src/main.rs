@@ -21,8 +21,9 @@ fn main() -> Result<()> {
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
+    // TODO: load batches automatically with a dataloader
+
     // Load Data & Encode directly
-    // let encoding = tokenizer.encode("Hello Tokenizer! How are you?", true)?;
     let sentences = [
         "The black cat sits outside",
         "A man is playing guitar",

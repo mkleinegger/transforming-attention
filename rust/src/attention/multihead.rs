@@ -39,13 +39,11 @@ impl MultiHeadAttentionBlock {
 
     pub fn forward(&self, q: &Tensor, k: &Tensor, v: &Tensor, mask: bool) -> Result<Tensor> {
         let head_size = self.d_model / self.n_heads;
-        println!("Multihead q: {}", q);
         // (batch, seq_len, d_model) --> (batch, seq_len, d_model)
         let q_prime = self.wq.forward(q)?;
         let k_prime = self.wk.forward(k)?;
         let v_prime = self.wv.forward(v)?;
 
-        println!("Q Prime: {}", q_prime);
 
         let (batch_size, seq_len, _) = q.dims3()?;
 
