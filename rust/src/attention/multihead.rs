@@ -16,6 +16,7 @@ pub struct MultiHeadAttentionBlock {
 
 impl MultiHeadAttentionBlock {
     pub fn new(vb: VarBuilder, config: &Config) -> Result<MultiHeadAttentionBlock> {
+        // TODO: no bias for these linear layers
         let wq = linear(config.d_model, config.d_model, vb.pp("wq"))?;
         let wk = linear(config.d_model, config.d_model, vb.pp("wk"))?;
         let wv = linear(config.d_model, config.d_model, vb.pp("wv"))?;
@@ -44,33 +45,35 @@ impl MultiHeadAttentionBlock {
         let k_prime = self.wk.forward(k)?;
         let v_prime = self.wv.forward(v)?;
 
-
-        let (batch_size, seq_len, _) = q.dims3()?;
+        let (batch_size, seq_len_decoder, _) = q.dims3()?;
 
         let query = q_prime
-            .reshape((batch_size, seq_len, self.n_heads, head_size))?
+            .reshape((batch_size, seq_len_decoder, self.n_heads, head_size))?
             .transpose(1, 2)?;
 
+        let (_, seq_len_encoder, _) = k.dims3()?;
+
         let key = k_prime
-            .reshape((batch_size, seq_len, self.n_heads, head_size))?
+            .reshape((batch_size, seq_len_encoder, self.n_heads, head_size))?
             .transpose(1, 2)?;
 
         let value = v_prime
-            .reshape((batch_size, seq_len, self.n_heads, head_size))?
+            .reshape((batch_size, seq_len_encoder, self.n_heads, head_size))?
             .transpose(1, 2)?;
 
         // calculate mask
         let mask = match mask {
-            true => Some(get_mask(seq_len, q.device())?),
+            true => Some(get_mask(seq_len_decoder, q.device())?),
             false => None,
         };
 
-        // TODO: implement attention_scores method
-        let (attention_scores, raw_attention_scores) =
+        // (batch, n_heads, seq_decoder, headsize)
+        let (attention_scores, _raw_attention_scores) =
             self.compute_attention_scores(query, key, value, mask)?;
+        // (batch, seq_decoder, d_model), where d_model = n_heads * headsize
         let res = attention_scores.transpose(1, 2)?.contiguous()?.reshape((
             batch_size,
-            seq_len,
+            seq_len_decoder,
             self.d_model,
         ))?;
         self.wo.forward(&res)
@@ -84,7 +87,7 @@ impl MultiHeadAttentionBlock {
         mask: Option<Tensor>,
     ) -> Result<(Tensor, Tensor)> {
         let divisor = Tensor::new((self.head_size as f32).sqrt(), query.device())?;
-        let mut attention_scores = query
+        let mut attention_scores = query // (batch, head, seq_len_decoder, seq_len_encoder)
             .contiguous()?
             .matmul(&key.t()?.contiguous()?)?
             .broadcast_div(&divisor)?;
@@ -100,9 +103,11 @@ impl MultiHeadAttentionBlock {
 
         let last_dim = attention_scores.dims().len();
         attention_scores = softmax(&attention_scores, last_dim - 1)?; // last_dim should be 4
-        let final_scores = attention_scores
+        let final_scores = attention_scores // (batch, head, seq_decoder, headsize)
             .contiguous()?
             .matmul(&value.contiguous()?)?;
+        // println!("encoder dims: {:?}, decoder dims: {:?}, value dims: {:?}", key.shape(), query.shape());
+        // println!("attention_scores {:?}", final_scores.shape());
         Ok((final_scores, attention_scores))
     }
 }

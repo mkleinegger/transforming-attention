@@ -21,7 +21,6 @@ fn main() -> Result<()> {
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
-    // TODO: load batches automatically with a dataloader
 
     // Load Data & Encode directly
     let sentences = [

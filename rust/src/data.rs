@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use candle_core::{Device, Result, Tensor};
 use candle_hf_hub::api::sync::Api;
@@ -84,10 +87,10 @@ pub struct DataLoader {
     en_tokens: Vec<Tensor>,
 }
 
-// TODO: implement batching by loading dataset as vec, tokenizing each string and creating a
-// tensor out of it. Then randomly select a batch of those tensors and stack them together,
-// resulting in a batch tensor of (batch, seq_len) which can be used directly as input for
-// the transformer.
+/// implement batching by loading dataset as vec, tokenizing each string and creating a
+/// tensor out of it. Then randomly select a batch of those tensors and stack them together,
+/// resulting in a batch tensor of (batch, seq_len) which can be used directly as input for
+/// the transformer.
 impl DataLoader {
     pub fn new(
         data: LazyFrame,
@@ -151,5 +154,171 @@ impl DataLoader {
             target: en_stacked,
         });
         Ok(res)
+    }
+}
+
+pub struct TranslationDataset {
+    pub src: Vec<Tensor>, // (seq_len)
+    pub tgt: Vec<Tensor>, // (seq_len)
+}
+
+impl TranslationDataset {
+    pub fn new(path: &str) -> anyhow::Result<Self> {
+        let device = Device::Cpu;
+        let data = LazyFrame::scan_parquet(path, Default::default())?.collect()?;
+
+        let data = data.head(Some(100));
+
+        fn to_tensor(data: &DataFrame, col: &str, device: &Device) -> Result<Vec<Tensor>> {
+            let src: Vec<Vec<i64>> = data
+                .column(col)
+                .unwrap()
+                .list()
+                .unwrap()
+                .into_no_null_iter()
+                .map(|s| s.i64().unwrap().into_no_null_iter().collect())
+                .collect();
+            let t: Vec<_> = src
+                .iter()
+                .map(|t| Tensor::new(t.as_slice(), device).unwrap())
+                .collect();
+            Ok(t)
+        }
+
+        Ok(Self {
+            src: to_tensor(&data, "inputs", &device)?,
+            tgt: to_tensor(&data, "targets", &device)?,
+        })
+    }
+
+    pub fn get(&self, index: usize) -> Result<(&Tensor, &Tensor)> {
+        Ok((self.src.get(index).unwrap(), self.tgt.get(index).unwrap()))
+    }
+
+    pub fn len(&self) -> usize {
+        self.src.len()
+    }
+}
+
+pub struct BatchSampler {
+    dataset: TranslationDataset,
+    max_tokens: usize,
+    pub num_batches: usize,
+    curr: usize,
+}
+
+impl BatchSampler {
+    pub fn new(dataset: TranslationDataset, max_tokens: usize) -> Result<Self> {
+        let num_batches = Self::calculate_num_batches(&dataset, max_tokens)?;
+
+        Ok(Self {
+            dataset,
+            max_tokens,
+            num_batches,
+            curr: 0,
+        })
+    }
+
+    pub fn collate(samples: &Vec<usize>, src: &Vec<Tensor>, tgt: &Vec<Tensor>) -> Batch {
+        let srcs: Vec<_> = samples
+            .iter()
+            .map(|s| src.get(*s).unwrap())
+            // .map(|s| self.dataset.get(*s).unwrap().0)
+            .collect();
+        let tgts: Vec<_> = samples
+            .iter()
+            // .map(|s| self.dataset.get(*s).unwrap().1)
+            .map(|s| tgt.get(*s).unwrap())
+            .collect();
+
+        let max_srcs: usize = srcs.iter().map(|t| t.dims1().unwrap()).max().unwrap();
+        let max_tgts: usize = tgts.iter().map(|t| t.dims1().unwrap()).max().unwrap();
+        let max = max_srcs.max(max_tgts);
+
+        let srcs = BatchSampler::pad_tensors(srcs, max_srcs).unwrap();
+        let src_tensor = Tensor::stack(srcs.as_slice(), 0).unwrap(); // (batch, seq_len)
+        let tgts = BatchSampler::pad_tensors(tgts, max_tgts).unwrap();
+        let tgt_tensor = Tensor::stack(tgts.as_slice(), 0).unwrap(); // (batch, seq_len)
+
+        Batch {
+            source: src_tensor,
+            target: tgt_tensor,
+        }
+    }
+
+    fn pad_tensors(tensors: Vec<&Tensor>, len: usize) -> Result<Vec<Tensor>> {
+        let res: Vec<_> = tensors
+            .iter()
+            .map(|t| t.pad_with_zeros(0, 0, len - t.dims1().unwrap()).unwrap())
+            .collect();
+
+        Ok(res)
+    }
+
+    fn calculate_num_batches(dataset: &TranslationDataset, max_tokens: usize) -> Result<usize> {
+        let mut num_batches = 0;
+        let mut src_tokens = 0;
+        let mut tgt_tokens = 0;
+
+        for idx in 0..dataset.len() {
+            let (src, tgt) = dataset.get(idx)?;
+
+            if src_tokens + src.dims1()? > max_tokens || tgt_tokens + tgt.dims1()? > max_tokens {
+                num_batches += 1;
+                tgt_tokens = 0;
+                src_tokens = 0;
+            }
+
+            src_tokens += src.dims1()?;
+            tgt_tokens += tgt.dims1()?;
+        }
+
+        if src_tokens != 0 || tgt_tokens != 0 {
+            num_batches += 1;
+        }
+
+        Ok(num_batches)
+    }
+}
+
+impl Iterator for BatchSampler {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut batch = Vec::new();
+        let mut src_tokens = 0;
+        let mut tgt_tokens = 0;
+
+        for idx in self.curr..self.dataset.len() {
+            let (src, tgt) = self.dataset.get(idx).unwrap();
+
+            if src_tokens + src.dims1().unwrap() > self.max_tokens
+                || tgt_tokens + tgt.dims1().unwrap() > self.max_tokens
+            {
+                self.curr = idx;
+                return Some(batch);
+            }
+            batch.push(idx);
+            src_tokens += src.dims1().unwrap();
+            tgt_tokens += tgt.dims1().unwrap();
+        }
+        self.curr = self.dataset.len();
+
+        if src_tokens != 0 || tgt_tokens != 0 {
+            return Some(batch);
+        }
+        self.curr = 0; // Iterator finished, do cleanup
+        None
+    }
+}
+
+struct Vocabulary {
+    pub idx2token: Vec<String>,
+    pub token2idx: HashMap<String, usize>,
+}
+
+impl Vocabulary {
+    pub fn new(path: &str) {
+        // TODO: implement Vocabulary
     }
 }
