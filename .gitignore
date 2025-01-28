@@ -172,5 +172,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-
 .attention-is-all-you-need
+resource
+tmp
