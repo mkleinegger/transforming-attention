@@ -1,5 +1,5 @@
 use candle_core::{Device, Result, Tensor};
-use candle_nn::{linear, ops::softmax, Dropout, Linear, Module, VarBuilder};
+use candle_nn::{linear, ops::softmax, Linear, Module, VarBuilder};
 
 use crate::config::Config;
 
@@ -7,7 +7,6 @@ pub struct MultiHeadAttentionBlock {
     n_heads: usize,
     d_model: usize,
     head_size: usize,
-    dropout: Dropout,
     wq: Linear,
     wk: Linear,
     wv: Linear,
@@ -22,15 +21,12 @@ impl MultiHeadAttentionBlock {
         let wv = linear(config.d_model, config.d_model, vb.pp("wv"))?;
         let wo = linear(config.d_model, config.d_model, vb.pp("wo"))?;
 
-        let dropout = Dropout::new(config.attention_dropout);
-
         assert!(config.d_model % config.n_heads == 0);
 
         Ok(Self {
             n_heads: config.n_heads,
             d_model: config.d_model,
             head_size: config.d_model / config.n_heads,
-            dropout,
             wq,
             wk,
             wv,
@@ -38,7 +34,14 @@ impl MultiHeadAttentionBlock {
         })
     }
 
-    pub fn forward(&self, q: &Tensor, k: &Tensor, v: &Tensor, mask: bool) -> Result<Tensor> {
+    pub fn forward(
+        &self,
+        q: &Tensor,
+        k: &Tensor,
+        v: &Tensor,
+        mask: Option<&Tensor>,
+    ) -> Result<Tensor> {
+        // println!("q: {q:?}, \nk: {k:?}, \nmask: {mask:?}");
         let head_size = self.d_model / self.n_heads;
         // (batch, seq_len, d_model) --> (batch, seq_len, d_model)
         let q_prime = self.wq.forward(q)?;
@@ -61,12 +64,6 @@ impl MultiHeadAttentionBlock {
             .reshape((batch_size, seq_len_encoder, self.n_heads, head_size))?
             .transpose(1, 2)?;
 
-        // calculate mask
-        let mask = match mask {
-            true => Some(get_mask(seq_len_decoder, q.device())?),
-            false => None,
-        };
-
         // (batch, n_heads, seq_decoder, headsize)
         let (attention_scores, _raw_attention_scores) =
             self.compute_attention_scores(query, key, value, mask)?;
@@ -84,7 +81,7 @@ impl MultiHeadAttentionBlock {
         query: Tensor,
         key: Tensor,
         value: Tensor,
-        mask: Option<Tensor>,
+        mask: Option<&Tensor>,
     ) -> Result<(Tensor, Tensor)> {
         let divisor = Tensor::new((self.head_size as f32).sqrt(), query.device())?;
         let mut attention_scores = query // (batch, head, seq_len_decoder, seq_len_encoder)
@@ -92,14 +89,18 @@ impl MultiHeadAttentionBlock {
             .matmul(&key.t()?.contiguous()?)?
             .broadcast_div(&divisor)?;
 
+        let (batch, head, seq_len_decoder, seq_len_encoder) = attention_scores.dims4()?;
+
+        // println!("att scores: {}", attention_scores);
         attention_scores = match mask {
             Some(m) => masked_fill(
+                -1e9f32,                                                           // f32::NEG_INFINITY,
+                &m.broadcast_as((batch, head, seq_len_decoder, seq_len_encoder))?, // &m.broadcast_left((query.dim(0)?, self.n_heads))?,
                 &attention_scores,
-                &m.broadcast_left((query.dim(0)?, self.n_heads))?,
-                f32::NEG_INFINITY,
             )?,
             None => attention_scores,
         };
+        // println!("filled: {attention_scores}");
 
         let last_dim = attention_scores.dims().len();
         attention_scores = softmax(&attention_scores, last_dim - 1)?; // last_dim should be 4
@@ -112,17 +113,19 @@ impl MultiHeadAttentionBlock {
     }
 }
 
-fn get_mask(size: usize, device: &Device) -> Result<Tensor> {
-    let mask: Vec<_> = (0..size)
-        .flat_map(|i| (0..size).map(move |j| u8::from(j > i)))
-        .collect();
+fn masked_fill(on_false: f32, mask: &Tensor, on_true: &Tensor) -> Result<Tensor> {
+    //
+    // 1 0 0 0 0
+    // 1 1 0 0 0
+    // 1 1 1 0 0
+    // 0 0 0 0 0
+    // 0 0 0 0 0
+    //
+    // println!("Masked mask: {}", mask);
+    // println!("masked on_true: {}", on_true);
 
-    Tensor::from_slice(&mask, (size, size), device)
-}
-
-fn masked_fill(on_false: &Tensor, mask: &Tensor, on_true: f32) -> Result<Tensor> {
-    let shape = mask.shape();
-    let on_true = Tensor::new(on_true, on_false.device())?.broadcast_as(shape.dims())?;
-    let m = mask.where_cond(&on_true, on_false)?;
+    let shape = mask.shape(); // (batch, 1, seq_len, seq_len)
+    let on_false = Tensor::new(on_false, on_true.device())?.broadcast_as(shape.dims())?;
+    let m = mask.where_cond(on_true, &on_false)?;
     Ok(m)
 }

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use candle_core::{DType, Device, IndexOp, Tensor};
+use candle_core::{DType, Device, Tensor};
 use ta::embeddings::positional_embeddings::PositionalEmbeddings;
 use ta::{config::Config, embeddings::input_embeddings::InputEmbeddings};
 
@@ -47,24 +47,24 @@ fn main() -> Result<()> {
     // println!("ids: {:?}", encoding.get_ids());
     println!("Token ids: {}", token_ids_batch);
 
-    let input_embeddings = InputEmbeddings::new(vocab_size, &config, vb.pp("input_embeddings"))?;
-    let word_embeddings = input_embeddings.forward(&token_ids_batch)?;
-    println!("word embeddings: {word_embeddings}");
-
-    let mut positional_embeddings = PositionalEmbeddings::new(&config, &device)?;
-    let encoder_input = positional_embeddings.forward(word_embeddings, false)?;
-
-    println!("encoder input: {encoder_input}");
-
-    let save_path =
-        Path::new("/home/lukas/Programming/uni/transforming-attention/rust/tmp/weights");
-    println!("Saving weights at {}", save_path.display());
-    varmap.save(save_path)?;
-
-    let loaded = candle_core::safetensors::load(save_path, &device)?;
-    // let loaded_varmap = VarBuilder::from_mmaped_safetensors(save_path, DType::F32, &device);
-    // let loaded_vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
-    println!("loaded: {:?}", loaded);
+    // let input_embeddings = InputEmbeddings::new(vocab_size, &config, vb.pp("input_embeddings"))?;
+    // let word_embeddings = input_embeddings.forward(&token_ids_batch)?;
+    // println!("word embeddings: {word_embeddings}");
+    //
+    // let mut positional_embeddings = PositionalEmbeddings::new(&config, &device)?;
+    // let encoder_input = positional_embeddings.forward(word_embeddings, false)?;
+    //
+    // println!("encoder input: {encoder_input}");
+    //
+    // let save_path =
+    //     Path::new("/home/lukas/Programming/uni/transforming-attention/rust/tmp/weights");
+    // println!("Saving weights at {}", save_path.display());
+    // varmap.save(save_path)?;
+    //
+    // let loaded = candle_core::safetensors::load(save_path, &device)?;
+    // // let loaded_varmap = VarBuilder::from_mmaped_safetensors(save_path, DType::F32, &device);
+    // // let loaded_vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
+    // println!("loaded: {:?}", loaded);
 
     Ok(())
 }

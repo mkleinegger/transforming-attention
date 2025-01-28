@@ -1,13 +1,12 @@
 use std::path::Path;
 
-use candle_core::{DType, Device, IndexOp, Tensor};
-use ta::embeddings::positional_embeddings::PositionalEmbeddings;
+use candle_core::{DType, Device, Tensor};
 use ta::transformer::Transformer;
-use ta::{config::Config, embeddings::input_embeddings::InputEmbeddings};
+use ta::config::Config;
 
 use candle_nn::{VarBuilder, VarMap};
 use tokenizers::tokenizer::{Result, Tokenizer};
-use tokenizers::{PaddingParams, PaddingStrategy};
+use tokenizers::PaddingParams;
 
 fn main() -> Result<()> {
     let mut tokenizer = Tokenizer::from_pretrained("bert-base-cased", None)?;
@@ -45,10 +44,10 @@ fn main() -> Result<()> {
     println!("Token ids: {}", token_ids_batch);
 
     let mut transformer = Transformer::new(vb, &config, vocab_size)?;
-    let encoded = transformer.encode(&token_ids_batch, false, false)?;
-    let decoded = transformer.decode(&token_ids_batch, &encoded, false, false, false)?;
-    let predictions = transformer.project(&decoded)?;
-    println!("Predictions: {}", predictions);
+    // let encoded = transformer.encode(&token_ids_batch, false, false)?;
+    // let decoded = transformer.decode(&token_ids_batch, &encoded, false, false, false)?;
+    // let predictions = transformer.project(&decoded)?;
+    // println!("Predictions: {}", predictions);
 
     // let input_embeddings = InputEmbeddings::new(vocab_size, &config, vb.pp("input_embeddings"))?;
     // let word_embeddings = input_embeddings.forward(&token_ids_batch)?;

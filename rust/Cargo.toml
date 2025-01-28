@@ -14,6 +14,9 @@ polars = { version = "0.45.1", features = ["cloud", "dtype-struct", "lazy", "par
 tokenizers = { version = "0.21.0", features = ["http"] }
 tracing = "0.1.41"
 
+[profile.dev]
+opt-level = 1
+
 [[bin]]
 name = "data"
 path = "src/bin/data.rs"

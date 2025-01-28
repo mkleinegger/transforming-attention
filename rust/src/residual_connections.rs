@@ -27,16 +27,19 @@ impl ResidualConnection {
         &self,
         xs: &Tensor,
         xs_encoder: Option<&Tensor>,
-        mask: bool,
+        mask: Option<&Tensor>,
         sublayer: SubLayer,
+        train: bool,
     ) -> Result<Tensor> {
         let sublayer_res = match sublayer {
             SubLayer::Attention(mha) => match xs_encoder {
-                Some(xs_encoder) => mha.forward(&xs, &xs_encoder, &xs_encoder, mask)?,
-                None => mha.forward(&xs, &xs, &xs, mask)?,
+                Some(xs_encoder) => mha.forward(xs, xs_encoder, xs_encoder, mask)?,
+                None => mha.forward(xs, xs, xs, mask)?,
             },
             SubLayer::FeedForward(ff) => ff.forward(&xs)?,
         };
+        // do dropout for all sublayers (self attention, cross attention and feed forward)
+        let sublayer_res = self.dropout.forward(&sublayer_res, train)?;
 
         self.norm.forward(&xs.add(&sublayer_res)?)
     }

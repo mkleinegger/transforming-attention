@@ -1,4 +1,4 @@
-use candle_core::{Device, Result, Tensor};
+use candle_core::{Result, Tensor};
 use candle_nn::{LayerNorm, Module};
 
 use crate::config::Config;

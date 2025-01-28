@@ -26,11 +26,12 @@ impl Decoder {
         &self,
         mut xs: Tensor,
         encoder_output: &Tensor,
-        tgt_mask: bool,
-        src_mask: bool,
+        tgt_mask: Option<&Tensor>,
+        src_mask: Option<&Tensor>,
+        train: bool
     ) -> Result<Tensor> {
         for block in self.layers.iter() {
-            xs = block.forward(xs, encoder_output, src_mask, tgt_mask)?
+            xs = block.forward(xs, encoder_output, src_mask, tgt_mask, train)?
         }
         self.norm.forward(&xs)
     }

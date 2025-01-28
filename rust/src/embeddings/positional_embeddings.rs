@@ -1,18 +1,18 @@
-use candle_core::{Device, IndexOp, Result, Tensor};
+use candle_core::{Device, Result, Tensor};
 use candle_nn::Dropout;
 
 use crate::config::Config;
 
 pub struct PositionalEmbeddings {
     positional_embeddings: Tensor,
-    seq_len: usize,
-    d_model: usize,
+    // seq_len: usize,
+    // d_model: usize,
     dropout: Dropout,
 }
 
 impl PositionalEmbeddings {
     pub fn new(config: &Config, device: &Device) -> Result<Self> {
-        let positions = Tensor::arange(0f32, config.seq_len as f32, device)?;
+        let positions = Tensor::arange(0f32, config.max_seq_len as f32, device)?;
         let denom = ((Tensor::arange_step(0f32, config.d_model as f32, 1f32, device)?
             * (-(10_000.0f64.ln()) / config.d_model as f64))?)
             .exp()?;
@@ -42,14 +42,14 @@ impl PositionalEmbeddings {
 
         // (1, seq_len, d_model)
         positional_embeddings = positional_embeddings
-            .reshape((config.d_model, config.seq_len))?
+            .reshape((config.d_model, config.max_seq_len))?
             .transpose(0, 1)?;
         // println!("Positional Embeddings: {}", positional_embeddings);
 
         Ok(PositionalEmbeddings {
             positional_embeddings,
-            seq_len: config.seq_len,
-            d_model: config.d_model,
+            // seq_len: config.seq_len,
+            // d_model: config.d_model,
             dropout: Dropout::new(config.pos_dropout),
         })
     }

@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf, thread::sleep, time};
 
 use candle_core::{Device, Result, Tensor};
 use candle_hf_hub::api::sync::Api;
@@ -95,8 +92,8 @@ impl DataLoader {
     pub fn new(
         data: LazyFrame,
         tokenizer: &Tokenizer,
-        batch_size: usize,
-        max_seq_len: usize,
+        _batch_size: usize,
+        _max_seq_len: usize,
     ) -> anyhow::Result<DataLoader> {
         let device = Device::Cpu;
         let unnested = data.unnest(["translation"]).collect()?; // [de (str), en (str)]
@@ -142,8 +139,6 @@ impl DataLoader {
         tokens
     }
 
-    pub fn load(path: &Path, batch_size: usize, max_seq_len: usize) {}
-
     pub fn epoch_iterable(&self) -> Result<Vec<Batch>> {
         let de_stacked = Tensor::stack(&self.de_tokens, 0)?;
         let en_stacked = Tensor::stack(&self.en_tokens, 0)?;
@@ -163,14 +158,19 @@ pub struct TranslationDataset {
 }
 
 impl TranslationDataset {
-    pub fn new(path: &str) -> anyhow::Result<Self> {
+    pub fn new(path: &str, max_len: usize) -> anyhow::Result<Self> {
         let device = Device::Cpu;
         let data = LazyFrame::scan_parquet(path, Default::default())?.collect()?;
 
-        let data = data.head(Some(100));
+        // let data = data.head(Some(100));
 
-        fn to_tensor(data: &DataFrame, col: &str, device: &Device) -> Result<Vec<Tensor>> {
-            let src: Vec<Vec<i64>> = data
+        fn to_tensor(
+            data: &DataFrame,
+            col: &str,
+            device: &Device,
+            max_len: usize,
+        ) -> Result<Vec<Tensor>> {
+            let mut src: Vec<Vec<i64>> = data
                 .column(col)
                 .unwrap()
                 .list()
@@ -178,16 +178,19 @@ impl TranslationDataset {
                 .into_no_null_iter()
                 .map(|s| s.i64().unwrap().into_no_null_iter().collect())
                 .collect();
+            src.iter_mut().for_each(|v| v.insert(0, 33708));
             let t: Vec<_> = src
                 .iter()
                 .map(|t| Tensor::new(t.as_slice(), device).unwrap())
+                .map(|t| t.narrow(0, 0, t.dims1().unwrap().min(max_len)).unwrap())
                 .collect();
+
             Ok(t)
         }
 
         Ok(Self {
-            src: to_tensor(&data, "inputs", &device)?,
-            tgt: to_tensor(&data, "targets", &device)?,
+            src: to_tensor(&data, "inputs", &device, max_len)?,
+            tgt: to_tensor(&data, "targets", &device, max_len)?,
         })
     }
 
@@ -233,7 +236,6 @@ impl BatchSampler {
 
         let max_srcs: usize = srcs.iter().map(|t| t.dims1().unwrap()).max().unwrap();
         let max_tgts: usize = tgts.iter().map(|t| t.dims1().unwrap()).max().unwrap();
-        let max = max_srcs.max(max_tgts);
 
         let srcs = BatchSampler::pad_tensors(srcs, max_srcs).unwrap();
         let src_tensor = Tensor::stack(srcs.as_slice(), 0).unwrap(); // (batch, seq_len)
@@ -256,55 +258,91 @@ impl BatchSampler {
     }
 
     fn calculate_num_batches(dataset: &TranslationDataset, max_tokens: usize) -> Result<usize> {
-        let mut num_batches = 0;
-        let mut src_tokens = 0;
-        let mut tgt_tokens = 0;
+        // let mut num_batches = 0;
+        // let mut src_tokens = 0;
+        // let mut tgt_tokens = 0;
 
-        for idx in 0..dataset.len() {
-            let (src, tgt) = dataset.get(idx)?;
 
-            if src_tokens + src.dims1()? > max_tokens || tgt_tokens + tgt.dims1()? > max_tokens {
-                num_batches += 1;
-                tgt_tokens = 0;
-                src_tokens = 0;
-            }
 
-            src_tokens += src.dims1()?;
-            tgt_tokens += tgt.dims1()?;
-        }
-
-        if src_tokens != 0 || tgt_tokens != 0 {
-            num_batches += 1;
-        }
-
+        // for idx in 0..dataset.len() {
+        //     let (src, tgt) = dataset.get(idx)?;
+        //
+        //     if src_tokens + src.dims1()? > max_tokens || tgt_tokens + tgt.dims1()? > max_tokens {
+        //         num_batches += 1;
+        //         tgt_tokens = 0;
+        //         src_tokens = 0;
+        //     }
+        //
+        //     src_tokens += src.dims1()?;
+        //     tgt_tokens += tgt.dims1()?;
+        // }
+        //
+        // if src_tokens != 0 || tgt_tokens != 0 {
+        //     num_batches += 1;
+        // }
+        let num_batches = dataset.len() / max_tokens;
         Ok(num_batches)
     }
 }
+
+// impl Iterator for BatchSampler {
+//     type Item = Vec<usize>;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let mut batch = Vec::new();
+//         let mut src_tokens = 0;
+//         let mut tgt_tokens = 0;
+//
+//         // sleep(time::Duration::from_secs(10));
+//
+//         // println!(
+//         //     "start {}/{} {} {} {}",
+//         //     self.curr,
+//         //     self.dataset.len(),
+//         //     src_tokens,
+//         //     tgt_tokens,
+//         //     batch.len()
+//         // );
+//         for idx in self.curr..self.dataset.len() {
+//             let (src, tgt) = self.dataset.get(idx).unwrap();
+//
+//             // println!("{idx} {:?} {:?}", src.dims(), tgt.dims());
+//
+//             if src_tokens + src.dims1().unwrap() > self.max_tokens
+//                 || tgt_tokens + tgt.dims1().unwrap() > self.max_tokens
+//             {
+//                 self.curr = idx;
+//                 println!("Batch {} finished", self.curr);
+//                 return Some(batch);
+//             }
+//             batch.push(idx);
+//             src_tokens += src.dims1().unwrap();
+//             tgt_tokens += tgt.dims1().unwrap();
+//         }
+//         self.curr = self.dataset.len();
+//         // println!("Last Batch");
+//
+//         if src_tokens != 0 {
+//             return Some(batch);
+//         }
+//         self.curr = 0; // Iterator finished, do cleanup
+//         None
+//     }
+// }
 
 impl Iterator for BatchSampler {
     type Item = Vec<usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut batch = Vec::new();
-        let mut src_tokens = 0;
-        let mut tgt_tokens = 0;
-
-        for idx in self.curr..self.dataset.len() {
-            let (src, tgt) = self.dataset.get(idx).unwrap();
-
-            if src_tokens + src.dims1().unwrap() > self.max_tokens
-                || tgt_tokens + tgt.dims1().unwrap() > self.max_tokens
-            {
-                self.curr = idx;
-                return Some(batch);
-            }
+        for idx in self.curr..self.dataset.len().min(self.curr + self.max_tokens) {
             batch.push(idx);
-            src_tokens += src.dims1().unwrap();
-            tgt_tokens += tgt.dims1().unwrap();
+            self.curr = idx;
         }
-        self.curr = self.dataset.len();
-
-        if src_tokens != 0 || tgt_tokens != 0 {
+        if batch.len() < self.max_tokens {
+            self.curr = self.dataset.len()
+        }
+        if batch.len() > 0 {
             return Some(batch);
         }
         self.curr = 0; // Iterator finished, do cleanup
@@ -320,5 +358,6 @@ struct Vocabulary {
 impl Vocabulary {
     pub fn new(path: &str) {
         // TODO: implement Vocabulary
+        todo!("implement vocabulary")
     }
 }

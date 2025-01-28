@@ -1,6 +1,4 @@
-use std::path::PathBuf;
-
-use ta::data::{HuggingfaceDataset, TranslationDataset};
+use ta::data::TranslationDataset;
 
 fn main() -> anyhow::Result<()>{
     println!("data");
@@ -12,10 +10,10 @@ fn main() -> anyhow::Result<()>{
     // println!("{:?}", dataset.train.collect().unwrap().head(None).get_columns());
     // println!("{:?}", dataset.train.collect().unwrap().shape());
 
-    let dataset = TranslationDataset::new(
-        "/home/lukas/Programming/uni/transforming-attention/data/translate_ende_small.parquet",
-    )?;
+    // let dataset = TranslationDataset::new(
+    //     "/home/lukas/Programming/uni/transforming-attention/data/translate_ende_small.parquet",
+    // )?;
 
-    println!("Dataset: {:?}", dataset.src);
+    // println!("Dataset: {:?}", dataset.src);
     Ok(())
 }

@@ -1,10 +1,9 @@
-use candle_core::{Device, Result, Tensor};
-use candle_nn::{linear, Dropout, Linear, Module, VarBuilder};
+use candle_core::{Result, Tensor};
+use candle_nn::{linear, Linear, Module, VarBuilder};
 
 use crate::config::Config;
 
 pub struct FeedForwardBlock {
-    dropout: Dropout,
     layers: Vec<Linear>,
 }
 
@@ -19,17 +18,11 @@ impl FeedForwardBlock {
             linear(config.d_feed_forward, config.d_model, vb.pp("1"))?,
         ];
 
-        Ok(Self {
-            layers,
-            dropout: Dropout::new(config.feed_forward_dropout),
-        })
+        Ok(Self { layers })
     }
 
-    // TODO: implement FeedForwardBlock
     pub fn forward(&self, xs: &Tensor) -> Result<Tensor> {
-        let res_layer0 = self
-            .dropout
-            .forward(&self.layers[0].forward(xs)?.relu()?, true)?;
+        let res_layer0 = &self.layers[0].forward(xs)?.relu()?;
 
         self.layers[1].forward(&res_layer0)
     }

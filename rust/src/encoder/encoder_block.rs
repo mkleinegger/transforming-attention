@@ -28,18 +28,20 @@ impl EncoderBlock {
         })
     }
 
-    pub fn forward(&self, xs: &Tensor, src_mask: bool) -> Result<Tensor> {
+    pub fn forward(&self, xs: &Tensor, src_mask: Option<&Tensor>, train: bool) -> Result<Tensor> {
         let x = self.residual_connections[0].forward(
             xs,
             None,
             src_mask,
             SubLayer::Attention(&self.attention),
+            train
         )?;
         self.residual_connections[1].forward(
             &x,
             None,
-            false,
+            None,
             SubLayer::FeedForward(&self.feed_forward),
+            train
         )
     }
 }

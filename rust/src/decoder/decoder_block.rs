@@ -32,28 +32,32 @@ impl DecoderBlock {
         &self,
         mut xs: Tensor,
         encoder_output: &Tensor,
-        src_mask: bool,
-        tgt_mask: bool,
+        src_mask: Option<&Tensor>,
+        tgt_mask: Option<&Tensor>,
+        train: bool
     ) -> Result<Tensor> {
         xs = self.residual_connections[0].forward(
             &xs,
             None,
-            src_mask,
+            tgt_mask,
             residual_connections::SubLayer::Attention(&self.attention),
+            train
         )?;
 
         xs = self.residual_connections[1].forward(
             &xs,
             Some(encoder_output),
-            tgt_mask,
+            src_mask,
             residual_connections::SubLayer::Attention(&self.cross_attention),
+            train
         )?;
 
         xs = self.residual_connections[2].forward(
             &xs,
             None,
-            false,
+            None,
             residual_connections::SubLayer::FeedForward(&self.feed_forward),
+            train
         )?;
 
         Ok(xs)
