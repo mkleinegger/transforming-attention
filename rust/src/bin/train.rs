@@ -2,15 +2,28 @@ use candle_core::{DType, Device};
 use candle_optimisers::adam::{Adam, ParamsAdam};
 use clap::builder::ValueParser;
 use clap::{arg, value_parser, Arg};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif_log_bridge::LogWrapper;
+use log::info;
 use std::path::{Path, PathBuf};
 use ta::config::Config;
 use ta::data::{Batch, BatchSampler, TranslationDataset};
 use ta::transformer::Transformer;
+use ta::util::progress_bar_style;
 
 use candle_nn::{loss, Optimizer, VarBuilder, VarMap};
 use tokenizers::tokenizer::Result;
 
+use env_logger::Env;
+
 fn main() -> Result<()> {
+    let env = Env::default().default_filter_or("info");
+    let logger = env_logger::Builder::from_env(env).build();
+    let level = logger.filter();
+    let multi = MultiProgress::new();
+    LogWrapper::new(multi.clone(), logger).try_init().unwrap();
+    log::set_max_level(level);
+
     let config = Config::default();
     let device = Device::cuda_if_available(0)?;
 
@@ -41,28 +54,34 @@ fn main() -> Result<()> {
     let train_file = matches.get_one::<PathBuf>("train").unwrap();
     let check_dir = matches.get_one::<PathBuf>("checkpoint").unwrap();
 
-    println!("Using GPU: {:?}", !device.is_cpu());
+    info!("Using GPU: {:?}", !device.is_cpu());
 
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
     let dataset = TranslationDataset::new(train_file, config.max_seq_len)?;
 
-    println!("Loading src");
+    info!("Loading src");
     let src = dataset.src.iter().cloned().collect();
-    println!("Loading tgt");
+    info!("Loading tgt");
     let tgt = dataset.tgt.iter().cloned().collect();
     let batch_sampler = BatchSampler::new(dataset, config.batch_size)?;
 
-    println!("Creating Batches");
+    info!("Creating Batches");
     let batch_samples: Vec<_> = batch_sampler.into_iter().collect();
-    println!("Collected batch_samples");
+
+    info!("Collating batches");
+    let progress_batches = multi.add(ProgressBar::new(batch_samples.len() as u64));
+    progress_batches.set_style(progress_bar_style("Creating Batches"));
     let batches: Vec<Batch> = batch_samples
         .iter()
-        .map(|s| BatchSampler::collate(s, &src, &tgt))
+        .map(|s| {
+            progress_batches.inc(1);
+            BatchSampler::collate(s, &src, &tgt)
+        })
         .collect();
 
-    println!("Create Transformer");
+    info!("Create Transformer");
     let mut transformer = Transformer::new(vb, &config, 33709)?;
     let mut optimizer = Adam::new(
         varmap.all_vars(),
@@ -76,6 +95,8 @@ fn main() -> Result<()> {
 
     let mut total_batches = 0;
     let num_batches = batch_samples.len();
+    let progress_steps = multi.add(ProgressBar::new(config.max_steps as u64));
+    progress_steps.set_style(progress_bar_style("Steps"));
     for epoch in 0..i32::MAX {
         let mut total_loss = 0f32;
         for (i, batch) in batches.iter().enumerate() {
@@ -112,23 +133,24 @@ fn main() -> Result<()> {
             let loss = loss.to_scalar::<f32>()?;
 
             if total_batches % config.log_x_steps == 0 {
-                println!("--- Epoch {epoch} Step {i}/{num_batches} Total Steps {total_batches}/{} loss: {loss} ---", config.max_steps);
+                info!("--- Epoch {epoch} Step {i}/{num_batches} Total Steps {total_batches}/{} loss: {loss} ---", config.max_steps);
                 let save_path = check_dir.join(format!("step_{total_batches}.safetensor"));
-                println!("Saving weights at {}", save_path.display());
+                info!("Saving weights at {}", save_path.display());
                 varmap.save(save_path)?;
             }
 
             total_loss += loss;
             total_batches += 1;
+            progress_steps.inc(1);
         }
         if total_batches >= config.max_steps {
             break;
         }
-        println!("=== Epoch {epoch} Total loss: {} ===", total_loss);
+        info!("=== Epoch {epoch} Total loss: {} ===", total_loss);
     }
 
     let save_path = check_dir.join("final.safetensor");
-    println!("Saving weights at {}", save_path.display());
+    info!("Saving weights at {}", save_path.display());
     varmap.save(save_path)?;
 
     // let loaded = candle_core::safetensors::load(save_path, &device)?;

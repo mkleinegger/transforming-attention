@@ -11,6 +11,10 @@ candle-hf-hub = "0.3.3"
 candle-nn = { version = "0.8.2", features = ["cuda"] }
 candle-optimisers = "0.8.0"
 clap = "4.5.27"
+env_logger = "0.11.6"
+indicatif = "0.17.11"
+indicatif-log-bridge = "0.2.3"
+log = "0.4.25"
 polars = { version = "0.45.1", features = ["cloud", "dtype-struct", "lazy", "parquet"] }
 tokenizers = { version = "0.21.0", features = ["http"] }
 tracing = "0.1.41"
