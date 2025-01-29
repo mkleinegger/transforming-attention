@@ -67,7 +67,9 @@ fn main() -> Result<()> {
     let mut optimizer = Adam::new(
         varmap.all_vars(),
         ParamsAdam {
-            lr: 0.004,
+            beta_1: 0.9,
+            beta_2: 0.98,
+            eps: 10e-9,
             ..Default::default()
         },
     )?;
@@ -99,18 +101,22 @@ fn main() -> Result<()> {
             let tgt_out = tgt_out.reshape(((),))?; // (batch * (seq_len - 1))
 
             let loss = loss::cross_entropy(&predictions, &tgt_out)?;
+            optimizer.set_learning_rate(
+                (config.d_model as f64).powf(-0.5)
+                    * f64::min(
+                        (total_batches as f64).powf(-0.5),
+                        total_batches as f64 * 4000f64.powf(-1.5),
+                    ),
+            );
             optimizer.backward_step(&loss)?;
             let loss = loss.to_scalar::<f32>()?;
 
             if total_batches % config.log_x_steps == 0 {
                 println!("--- Epoch {epoch} Step {i}/{num_batches} Total Steps {total_batches}/{} loss: {loss} ---", config.max_steps);
-                let save_path = check_dir.join(format!("step_{i}.safetensor"));
+                let save_path = check_dir.join(format!("step_{total_batches}.safetensor"));
                 println!("Saving weights at {}", save_path.display());
                 varmap.save(save_path)?;
             }
-
-            // TODO: set correct learning rate
-            optimizer.set_learning_rate(optimizer.learning_rate() * 0.9);
 
             total_loss += loss;
             total_batches += 1;
