@@ -1,8 +1,8 @@
-use std::path::Path;
+// use std::path::Path;
 
 use candle_core::{DType, Device, Tensor};
-use ta::embeddings::positional_embeddings::PositionalEmbeddings;
-use ta::{config::Config, embeddings::input_embeddings::InputEmbeddings};
+// use ta::embeddings::positional_embeddings::PositionalEmbeddings;
+// use ta::{config::Config, embeddings::input_embeddings::InputEmbeddings};
 
 use candle_nn::{VarBuilder, VarMap};
 use tokenizers::tokenizer::{Result, Tokenizer};
@@ -10,7 +10,7 @@ use tokenizers::tokenizer::{Result, Tokenizer};
 fn main() -> Result<()> {
     let tokenizer = Tokenizer::from_pretrained("bert-base-cased", None)?;
 
-    let config = Config::default();
+    // let config = Config::default();
 
     let vocab_size = tokenizer.get_vocab_size(true);
     println!("Tokenizer uses vocab of size: {:?}", vocab_size);
@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     println!("Using GPU: {:?}", !device.is_cpu());
 
     let varmap = VarMap::new();
-    let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+    let _vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
     // Load Data & Encode directly
     // let encoding = tokenizer.encode("Hello Tokenizer! How are you?", true)?;

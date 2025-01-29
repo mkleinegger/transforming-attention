@@ -1,5 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, thread::sleep, time};
-
+use std::path::PathBuf;
 use candle_core::{Device, Result, Tensor};
 use candle_hf_hub::api::sync::Api;
 use polars::prelude::*;
@@ -262,8 +261,6 @@ impl BatchSampler {
         // let mut src_tokens = 0;
         // let mut tgt_tokens = 0;
 
-
-
         // for idx in 0..dataset.len() {
         //     let (src, tgt) = dataset.get(idx)?;
         //
@@ -350,14 +347,14 @@ impl Iterator for BatchSampler {
     }
 }
 
-struct Vocabulary {
-    pub idx2token: Vec<String>,
-    pub token2idx: HashMap<String, usize>,
-}
-
-impl Vocabulary {
-    pub fn new(path: &str) {
-        // TODO: implement Vocabulary
-        todo!("implement vocabulary")
-    }
-}
+// struct Vocabulary {
+//     pub idx2token: Vec<String>,
+//     pub token2idx: HashMap<String, usize>,
+// }
+//
+// impl Vocabulary {
+//     pub fn new(path: &str) {
+//         // TODO: implement Vocabulary
+//         todo!("implement vocabulary")
+//     }
+// }

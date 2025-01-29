@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use candle_core::{DType, Device, Tensor};
-use ta::transformer::Transformer;
 use ta::config::Config;
+// use ta::transformer::Transformer;
 
 use candle_nn::{VarBuilder, VarMap};
 use tokenizers::tokenizer::{Result, Tokenizer};
@@ -11,15 +11,14 @@ use tokenizers::PaddingParams;
 fn main() -> Result<()> {
     let mut tokenizer = Tokenizer::from_pretrained("bert-base-cased", None)?;
     tokenizer.with_padding(Some(PaddingParams::default()));
-    let config = Config::default();
+    let _config = Config::default();
     let vocab_size = tokenizer.get_vocab_size(true);
     println!("Tokenizer uses vocab of size: {:?}", vocab_size);
     let device = Device::cuda_if_available(0)?;
     println!("Using GPU: {:?}", !device.is_cpu());
 
     let varmap = VarMap::new();
-    let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
-
+    let _vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
     // Load Data & Encode directly
     let sentences = [
@@ -43,7 +42,7 @@ fn main() -> Result<()> {
     let token_ids_batch = Tensor::stack(&token_ids_batch, 0)?;
     println!("Token ids: {}", token_ids_batch);
 
-    let mut transformer = Transformer::new(vb, &config, vocab_size)?;
+    // let mut transformer = Transformer::new(vb, &config, vocab_size)?;
     // let encoded = transformer.encode(&token_ids_batch, false, false)?;
     // let decoded = transformer.decode(&token_ids_batch, &encoded, false, false, false)?;
     // let predictions = transformer.project(&decoded)?;

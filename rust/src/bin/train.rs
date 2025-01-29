@@ -1,11 +1,11 @@
 use candle_core::{DType, Device};
 use candle_optimisers::adam::{Adam, ParamsAdam};
 use clap::builder::ValueParser;
-use clap::{arg, value_parser, Arg};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use clap::{value_parser, Arg};
+use indicatif::{MultiProgress, ProgressBar};
 use indicatif_log_bridge::LogWrapper;
 use log::info;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use ta::config::Config;
 use ta::data::{Batch, BatchSampler, TranslationDataset};
 use ta::transformer::Transformer;
