@@ -1,25 +1,52 @@
 use candle_core::{DType, Device};
 use candle_optimisers::adam::{Adam, ParamsAdam};
-use std::path::Path;
+use clap::builder::ValueParser;
+use clap::{arg, value_parser, Arg};
+use std::path::{Path, PathBuf};
 use ta::config::Config;
 use ta::data::{Batch, BatchSampler, TranslationDataset};
 use ta::transformer::Transformer;
 
 use candle_nn::{loss, Optimizer, VarBuilder, VarMap};
-use tokenizers::tokenizer::{Result, Tokenizer};
+use tokenizers::tokenizer::Result;
 
 fn main() -> Result<()> {
     let config = Config::default();
     let device = Device::cuda_if_available(0)?;
+
+    let matches = clap::Command::new("train")
+        .about("Train candle transformer on bilingual data")
+        .bin_name("train")
+        .styles(Default::default())
+        .arg_required_else_help(true)
+        .arg(
+            Arg::new("train")
+                .value_name("FILE")
+                .help("Training file of bilingual dataset used for training the transformer")
+                .short('t')
+                .long("train")
+                .required(true)
+                .value_parser(value_parser!(PathBuf)),
+        )
+        .arg(
+            Arg::new("checkpoint")
+                .value_name("FILE")
+                .help("Checkpoint dir where model files will be written to")
+                .short('c')
+                .long("check")
+                .required(true)
+                .value_parser(ValueParser::path_buf()),
+        )
+        .get_matches();
+    let train_file = matches.get_one::<PathBuf>("train").unwrap();
+    let check_dir = matches.get_one::<PathBuf>("checkpoint").unwrap();
+
     println!("Using GPU: {:?}", !device.is_cpu());
 
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
-    let dataset = TranslationDataset::new(
-        "/home/lukas/Programming/uni/transforming-attention/data/translate_ende_small.parquet",
-        config.max_seq_len,
-    )?;
+    let dataset = TranslationDataset::new(train_file, config.max_seq_len)?;
 
     println!("Loading src");
     let src = dataset.src.iter().cloned().collect();
@@ -77,14 +104,12 @@ fn main() -> Result<()> {
 
             if total_batches % config.log_x_steps == 0 {
                 println!("--- Epoch {epoch} Step {i}/{num_batches} Total Steps {total_batches}/{} loss: {loss} ---", config.max_steps);
-                let save_path = Path::new(
-                    "/home/lukas/Programming/uni/transforming-attention/rust/tmp/weights",
-                );
+                let save_path = check_dir.join(format!("step_{i}.safetensor"));
                 println!("Saving weights at {}", save_path.display());
                 varmap.save(save_path)?;
             }
 
-            // TODO: set correct learning rate asd
+            // TODO: set correct learning rate
             optimizer.set_learning_rate(optimizer.learning_rate() * 0.9);
 
             total_loss += loss;
@@ -96,8 +121,7 @@ fn main() -> Result<()> {
         println!("=== Epoch {epoch} Total loss: {} ===", total_loss);
     }
 
-    let save_path =
-        Path::new("/home/lukas/Programming/uni/transforming-attention/rust/tmp/weights");
+    let save_path = check_dir.join("final.safetensor");
     println!("Saving weights at {}", save_path.display());
     varmap.save(save_path)?;
 

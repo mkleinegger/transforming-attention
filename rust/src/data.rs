@@ -158,7 +158,7 @@ pub struct TranslationDataset {
 }
 
 impl TranslationDataset {
-    pub fn new(path: &str, max_len: usize) -> anyhow::Result<Self> {
+    pub fn new(path: &PathBuf, max_len: usize) -> anyhow::Result<Self> {
         let device = Device::Cpu;
         let data = LazyFrame::scan_parquet(path, Default::default())?.collect()?;
 
