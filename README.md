@@ -1,6 +1,6 @@
 # **Transformer Implementations**
 
-This repository contains Transformer model implementations in **Rust, PyTorch, and JAX**, based on the paper **[Attention is All You Need](https://arxiv.org/pdf/1706.03762)**.
+This repository contains Transformer model implementations in **Rust and PyTorch**, based on the paper **[Attention is All You Need](https://arxiv.org/pdf/1706.03762)**. Furthermore, we provide code to reproduce results using the original **[Tensor2Tensor (T2T)](https://github.com/tensorflow/tensor2tensor.git)** implementation.
 
 ## **Dataset**
 o ensure consistent sentence embeddings across all implementations, we provide **tokenized translation datasets** in **Parquet format** and a **vocabulary file** (`vocab.ende`) in the `data/` directory. The dataset was generated using **[Tensor2Tensor (T2T)](https://github.com/tensorflow/tensor2tensor.git)**, the original implementation of the **Attention is All You Need** paper, with **subword tokenization** applied to the `translate_ende_wmt32k` dataset.
