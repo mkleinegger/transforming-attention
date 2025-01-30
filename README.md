@@ -34,6 +34,11 @@ shape: (45_782, 2)
 - `data/` - Tokenized datasets and vocabulary file.
 - `examples/` - Example scripts.
 
+## **Running**
+Use `create_env.sh` to create an environment. After activating it, the code should run with just `python script.py`. If you want to use multi-gpu just run it with `torchrun torchrun --nproc-per-node=num_nodes train.py` and `torchrun torchrun --nproc-per-node=num_nodes predict.py`
+
+After training and predicting just use `bleu.py` to compute the result. Before running just check that you load the right checkpoints for each file, before each step.
+
 ## **References**
 - **[Attention is All You Need](https://arxiv.org/pdf/1706.03762)**
 - **[Tensor2Tensor (T2T)](https://github.com/tensorflow/tensor2tensor.git)**
