@@ -11,8 +11,8 @@ use ta::data::{Batch, BatchSampler, TranslationDataset};
 use ta::transformer::Transformer;
 use ta::util::progress_bar_style;
 
+use candle_core::Result;
 use candle_nn::{loss, Optimizer, VarBuilder, VarMap};
-use tokenizers::tokenizer::Result;
 
 use env_logger::Env;
 
@@ -59,12 +59,12 @@ fn main() -> Result<()> {
     let mut varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
-    let dataset = TranslationDataset::new(train_file, config.max_seq_len)?;
+    let dataset = TranslationDataset::new(train_file, config.max_seq_len).unwrap();
 
     info!("Loading src");
-    let src = dataset.src.iter().cloned().collect();
+    let src = dataset.src.to_vec();
     info!("Loading tgt");
-    let tgt = dataset.tgt.iter().cloned().collect();
+    let tgt = dataset.tgt.to_vec();
     let batch_sampler = BatchSampler::new(dataset, config.batch_size)?;
 
     info!("Creating Batches");
@@ -156,16 +156,19 @@ fn main() -> Result<()> {
     ) -> Result<Tensor> {
         // TODO: filter padding tokens
 
-        let indices: Vec<usize> = target
-            .to_vec1()?
+        let vec: Vec<i64> = target.to_vec1()?;
+        let filtered: Vec<_> = vec
             .iter()
-            .filter(|i| i != padding_token)
-            .collect()?;
+            .enumerate()
+            .filter(|(_i, index)| **index == (padding_token as i64))
+            .map(|(i, _index)| i as u32)
+            .collect();
 
-        let target_filtered = target.index_select(indices, 0)?;
-        let predictions_filtered = predictions.index_select(indices, 0)?;
+        let indices: Tensor = Tensor::new(filtered, predictions.device())?;
 
-        loss::cross_entropy(&predictions, &target)
+        let target_filtered = target.index_select(&indices, 0)?;
+        let predictions_filtered = predictions.index_select(&indices, 0)?;
+        loss::cross_entropy(&predictions_filtered, &target_filtered)
     }
 
     let save_path = check_dir.join("final.safetensor");
