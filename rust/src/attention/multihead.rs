@@ -159,7 +159,7 @@ mod tests {
         let x = Tensor::new(&[[1f32, 2., 3.], [4., 5., 6.], [0., 0., 0.]], &device)?
             .unsqueeze(0)?
             .unsqueeze(0)?;
-        let mask = Tensor::new(&[[1u8, 1, 1], [1, 1, 0], [0, 0, 0]], &device)?
+        let mask = Tensor::new(&[[1u8, 0, 0], [1, 1, 0], [1, 1, 1]], &device)?
             .unsqueeze(0)?
             .unsqueeze(0)?;
         println!("x: \n{x}\nmask: \n{mask}");

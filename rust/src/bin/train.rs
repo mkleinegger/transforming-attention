@@ -1,4 +1,4 @@
-use candle_core::{DType, Device};
+use candle_core::{DType, Device, Tensor};
 use candle_optimisers::adam::{Adam, ParamsAdam};
 use clap::builder::ValueParser;
 use clap::{value_parser, Arg};
@@ -121,7 +121,7 @@ fn main() -> Result<()> {
             predictions = predictions.reshape(((), predictions.dim(2)?))?; // (batch * (seq_len - 1), vocab_size)
             let tgt_out = tgt_out.reshape(((),))?; // (batch * (seq_len - 1))
 
-            let loss = loss::cross_entropy(&predictions, &tgt_out)?;
+            let loss = calculate_loss(&predictions, &tgt_out, 0)?;
             optimizer.set_learning_rate(
                 (config.d_model as f64).powf(-0.5)
                     * f64::min(
@@ -149,11 +149,30 @@ fn main() -> Result<()> {
         info!("=== Epoch {epoch} Total loss: {} ===", total_loss);
     }
 
+    fn calculate_loss(
+        predictions: &Tensor,
+        target: &Tensor,
+        padding_token: usize,
+    ) -> Result<Tensor> {
+        // TODO: filter padding tokens
+
+        let indices: Vec<usize> = target
+            .to_vec1()?
+            .iter()
+            .filter(|i| i != padding_token)
+            .collect()?;
+
+        let target_filtered = target.index_select(indices, 0)?;
+        let predictions_filtered = predictions.index_select(indices, 0)?;
+
+        loss::cross_entropy(&predictions, &target)
+    }
+
     let save_path = check_dir.join("final.safetensor");
     info!("Saving weights at {}", save_path.display());
-    varmap.save(save_path)?;
+    varmap.save(&save_path)?;
 
-    let loaded = candle_core::safetensors::load(save_path, &device)?;
+    let loaded = candle_core::safetensors::load(&save_path, &device)?;
     // let loaded_varmap = VarBuilder::from_mmaped_safetensors(save_path, DType::F32, &device);
     let loaded_vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
     println!("loaded: {:?}", loaded);

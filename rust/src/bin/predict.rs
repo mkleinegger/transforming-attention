@@ -120,16 +120,16 @@ fn main() -> Result<()> {
     //     .collect::<ListChunked>()
     //     .into_series();
 
-    let s1 = Column::new("generated".into(), &generated_data.iter().map(|l| l));
-    let s2 = Column::new("target".into(), &target_data);
-
-    let df = DataFrame::new(vec![s1, s2])?;
-
-    // Save DataFrame as a Parquet file
-    let file = File::create("output.parquet")?;
-    ParquetWriter::new(file)
-        .with_compression(ParquetCompression::Zstd(None))
-        .finish(&mut df)?;
+    // let s1 = Column::new("generated".into(), &generated_data.iter().map(|l| l));
+    // let s2 = Column::new("target".into(), &target_data);
+    //
+    // let df = DataFrame::new(vec![s1, s2])?;
+    //
+    // // Save DataFrame as a Parquet file
+    // let file = File::create("output.parquet")?;
+    // ParquetWriter::new(file)
+    //     .with_compression(ParquetCompression::Zstd(None))
+    //     .finish(&mut df)?;
 
 
     Ok(())
