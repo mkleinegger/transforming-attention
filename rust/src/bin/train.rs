@@ -56,7 +56,7 @@ fn main() -> Result<()> {
 
     info!("Using GPU: {:?}", !device.is_cpu());
 
-    let varmap = VarMap::new();
+    let mut varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
     let dataset = TranslationDataset::new(train_file, config.max_seq_len)?;
@@ -153,10 +153,10 @@ fn main() -> Result<()> {
     info!("Saving weights at {}", save_path.display());
     varmap.save(save_path)?;
 
-    // let loaded = candle_core::safetensors::load(save_path, &device)?;
+    let loaded = candle_core::safetensors::load(save_path, &device)?;
     // let loaded_varmap = VarBuilder::from_mmaped_safetensors(save_path, DType::F32, &device);
-    // let loaded_vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
-    // println!("loaded: {:?}", loaded);
+    let loaded_vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
+    println!("loaded: {:?}", loaded);
 
     Ok(())
 }

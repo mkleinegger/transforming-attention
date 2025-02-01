@@ -40,7 +40,7 @@ fn main() -> Result<()> {
             .value_parser(ValueParser::path_buf()),
     )
     .get_matches();
-    
+
     let data_file = matches.get_one::<PathBuf>("data").unwrap();
     let model_file = matches.get_one::<PathBuf>("model").unwrap();
 
@@ -48,6 +48,7 @@ fn main() -> Result<()> {
     // load weights
     let loaded = candle_core::safetensors::load(model_file, &device)?;
     let vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
+    println!("vb: {:?}", vb.get((33709, 512), "encode_embeddings"));
 
     // oad transformer
     let mut transformer = Transformer::new(vb, &config, 33709)?;
@@ -83,20 +84,20 @@ fn main() -> Result<()> {
         for _ in 0..max_length {
             let predictions = transformer.forward(&input_tensor, &next_token, true, false, false)?;
             let last_token_logits = predictions.i((0, predictions.dim(1)? - 1))?;
-        
+
             let next_token_id = last_token_logits.argmax(0)?.to_dtype(candle_core::DType::I64)?.to_scalar::<i64>()?;
-            
+
             output_tokens.push(next_token_id);
-            
+
             if next_token_id == eos_token_id {
                 break;
             }
-        
+
             // Append new token to the input sequence
             next_token = Tensor::from_vec(vec![next_token_id], (1, 1), &device)?;
-        
+
             input_tensor = Tensor::cat(&[&input_tensor, &next_token], 1)?;
-        
+
             // Ensure `input_tensor` does not exceed `max_seq_len`
             if input_tensor.dim(1)? > max_seq_len {
                 input_tensor = input_tensor.narrow(1, input_tensor.dim(1)? - max_seq_len, max_seq_len)?;
@@ -119,7 +120,7 @@ fn main() -> Result<()> {
     //     .collect::<ListChunked>()
     //     .into_series();
 
-    let s1 = Column::new("generated".into(), &generated_data);
+    let s1 = Column::new("generated".into(), &generated_data.iter().map(|l| l));
     let s2 = Column::new("target".into(), &target_data);
 
     let df = DataFrame::new(vec![s1, s2])?;
