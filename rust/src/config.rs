@@ -34,7 +34,7 @@ impl Default for Config {
             pos_dropout: 0.3,
             residual_dropout: 0.3,
             feed_forward_dropout: 0.3,
-            batch_size: 8,
+            batch_size: 16,
             max_seq_len: 256,
             max_steps: 100_000,
             log_x_steps: 1_000,
