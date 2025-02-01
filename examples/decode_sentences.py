@@ -20,7 +20,7 @@ class T2TVocabulary:
 
 
 VOCAB_FILE = 'data/vocab.ende'
-DATASET_FILE = 'data/translate_ende_small.parquet'
+DATASET_FILE = 'data/dataset.parquet'
 
 
 if __name__ == "__main__":

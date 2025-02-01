@@ -48,19 +48,15 @@ class SelfAttention(nn.Module):
 
     def forward(self, query, key, value, mask=None):
         _, _, _, d_k = key.size()
-        k_t = key.transpose(2, 3)  # transpose
-        score = (query @ k_t) / math.sqrt(d_k)  # scaled dot product
+        k_t = key.transpose(2, 3)
+        score = (query @ k_t) / math.sqrt(d_k) 
 
         # 2. apply masking (opt)
         if mask is not None:
             score = score.masked_fill(mask == 0, -1e9)
 
-        # 3. pass them softmax to make [0, 1] range
         score = self.softmax(score)
-
-        # 4. multiply with Value
         value = score @ value
-
         return value
         
 # Multi-head attention layer
@@ -69,11 +65,8 @@ class MultiHeadAttentionBlock(nn.Module):
         super(MultiHeadAttentionBlock, self).__init__()
         self.embedding_dim = d_model
         self.self_attention = SelfAttention()
-        # The number of heads
-        self.num_heads = num_heads
-        # The dimension of each head
-        self.dim_per_head = d_model // num_heads
-        # The linear projections
+        self.num_heads = num_heads # The number of heads
+        self.dim_per_head = d_model // num_heads # The dimension of each head
         self.query_projection = nn.Linear(d_model, d_model)
         self.key_projection = nn.Linear(d_model, d_model)
         self.value_projection = nn.Linear(d_model, d_model)
@@ -81,20 +74,17 @@ class MultiHeadAttentionBlock(nn.Module):
         self.out = nn.Linear(d_model, d_model)
 
     def forward(self, query, key, value, mask=None):
-        # Apply the linear projections
         batch_size, _, _ = key.size()
         query = self.query_projection(query)
         key = self.key_projection(key)
         value = self.value_projection(value)
-        # Reshape the input
+
         query = query.view(batch_size, -1, self.num_heads, self.dim_per_head).transpose(1, 2)
         key = key.view(batch_size, -1, self.num_heads, self.dim_per_head).transpose(1, 2)
         value = value.view(batch_size, -1, self.num_heads, self.dim_per_head).transpose(1, 2)
-        # Calculate the attention
+
         output = self.self_attention(query, key, value, mask)
-        # Reshape the output
         output = output.transpose(1, 2).contiguous().view(batch_size, -1, self.embedding_dim)
-        # Apply the linear projection
         output = self.out(output)
         return output
 
@@ -160,7 +150,6 @@ class DecoderLayer(nn.Module):
         self.dropout3 = nn.Dropout(dropout)
 
     def forward(self, x, encoder_output, src_mask, tgt_mask):
-        # 1. compute self attention
         _x = x
         x = self.attention1(query=x, key=x, value=x, mask=tgt_mask)
         x = self.dropout1(x)
@@ -241,7 +230,7 @@ class Transformer(nn.Module):
         src_mask = (src != self.pad_idx).unsqueeze(1).unsqueeze(2)        
         
         x = self.src_embedding(src)
-        x = self.src_positional_encoding(src)
+        x = self.src_positional_encoding(x)
         
         for layer in self.encoder:
             x = layer(x, src_mask)
@@ -253,8 +242,8 @@ class Transformer(nn.Module):
         nopeak_mask = torch.tril(torch.ones(tgt.size(1), tgt.size(1))).type(torch.ByteTensor).to(self.device)
         tgt_mask = tgt_mask & nopeak_mask
         
-        x = self.src_embedding(tgt)
-        x = self.src_positional_encoding(tgt)
+        x = self.tgt_embedding(tgt)
+        x = self.tgt_positional_encoding(x)
         
         for layer in self.decoder:
             x = layer(x, memory, src_mask, tgt_mask)

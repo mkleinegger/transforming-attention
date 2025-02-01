@@ -4,3 +4,5 @@ numpy
 polars
 datasets
 transformers
+IProgress
+nltk

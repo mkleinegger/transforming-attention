@@ -25,16 +25,17 @@ def collate_fn(batch, max_length=512):
 
 # Translation dataset
 class TranslationDataset(Dataset):
-    def __init__(self, path, pad_idx=0):
+    def __init__(self, path, pad_idx=0, start_idx=-1):
         self.data = pl.read_parquet(path)
         self.pad_idx = pad_idx
+        self.start_idx = start_idx
 
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, idx):
-        src_data = self.data["inputs"][idx]
-        tgt_data = self.data["targets"][idx]
+        src_data = [self.start_idx] + self.data["inputs"][idx].to_list()
+        tgt_data = [self.start_idx] + self.data["targets"][idx].to_list()
 
         return torch.tensor(src_data, dtype=torch.long), torch.tensor(tgt_data, dtype=torch.long)
 

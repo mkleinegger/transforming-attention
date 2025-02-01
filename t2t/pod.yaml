@@ -9,7 +9,7 @@ spec:
     capi.stackhpc.com/node-group: gpu-workers-t4
   containers:
   - name: t2t
-    image: bitspeech/tensor2tensor:1.7.0-gpu
+    image: jtaha/tensor2tensor:1.7.0-gpu
     resources:
       limits:
         nvidia.com/gpu: 8

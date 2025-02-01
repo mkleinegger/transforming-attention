@@ -1,132 +1,117 @@
-import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader, DistributedSampler
 
 from tqdm.auto import tqdm
-import torch
 from torch import optim
-from pytorch.data import (
+
+from data import (
     TokenSumBatchSampler,
     TranslationDataset,
     collate_fn,
     load_vocab,
 )
-from pytorch.transformer import Transformer
-from pytorch.utils import load_checkpoint, save_checkpoint
-from torch.utils.data import DataLoader
+from transformer import Transformer
+from utils import save_checkpoint
 
 
 class AttentionIsAllYouNeedSchedule(optim.lr_scheduler._LRScheduler):
     """
     Custom learning rate schedule as described in the Transformer paper:
-    lrate = d_model^(-0.5) * min(step_num^(-0.5), step_num * warmup_steps^(-1.5))
+    lrate = d_model^(-0.5) * min(step_num^(-0.5), step_num*(warmup_steps^(-1.5)))
     """
-
     def __init__(self, optimizer, d_model, warmup_steps=4000, last_epoch=-1):
-
         self.d_model = d_model
         self.warmup_steps = warmup_steps
         super(AttentionIsAllYouNeedSchedule, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
-        step_num = max(1, self._step_count)  # Ensure step_num >= 1
-        scale = self.d_model**-0.5
-        warmup_factor = step_num**-0.5
-        linear_warmup = step_num * (self.warmup_steps**-1.5)
+        step_num = max(1, self._step_count)
+        scale = self.d_model ** -0.5
+        warmup_factor = step_num ** -0.5
+        linear_warmup = step_num * (self.warmup_steps ** -1.5)
         lr = scale * min(warmup_factor, linear_warmup)
-
         return [lr for _ in self.base_lrs]
 
 
-def train(
+def train_one_epoch(
     model,
     dataloader,
     optimizer,
     scheduler,
     criterion,
+    device,
+    current_step,
     total_steps,
-    device="cpu",
-    verbose=True,
-    save_dir="checkpoints",
-    save_interval=1000,
-    checkpoint_path=None,
+    save_interval,
+    save_dir,
+    rank,
+    verbose=True
 ):
-    model = model.to(device)
     model.train()
-    step = 0
     epoch_loss = 0
+    local_step = current_step 
 
-    # Load from checkpoint if provided
-    if checkpoint_path:
-        step = load_checkpoint(model, optimizer, scheduler, checkpoint_path)
+    if rank == 0:
+        dataloader = tqdm(dataloader, desc="Training")
 
-    # Loop through the dataloader
-    for step in tqdm(range(total_steps), desc="Training Transformer"):
-        for batch in dataloader:
-            # Stop training after the total number of steps
-            if step >= total_steps:
-                break
+    for batch in dataloader:
+        if local_step >= total_steps:
+            break
 
-            src, trg = batch
-            src, trg = src.to(device), trg.to(device)
-            optimizer.zero_grad()
+        src, trg = batch
+        src, trg = src.to(device), trg.to(device)
+        optimizer.zero_grad()
 
-            output = model(src, trg[:, :-1])
-            output_reshape = output.contiguous().view(-1, output.shape[-1])
-            trg = trg[:, 1:].contiguous().view(-1)
+        output = model(src, trg[:, :-1])  # [B, T-1, Vocab]
+        output_reshape = output.contiguous().view(-1, output.shape[-1])  # [B*(T-1), V]
+        trg_reshape = trg[:, 1:].contiguous().view(-1)  # [B*(T-1)]
 
-            loss = criterion(output_reshape, trg)
+        loss = criterion(output_reshape, trg_reshape)
+        loss.backward()
 
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
+        optimizer.step()
+        scheduler.step()
 
-            epoch_loss += loss.item()
-            step += 1
+        epoch_loss += loss.item()
+        local_step += 1
 
-            # Save checkpoint at intervals
-            if step % save_interval == 0 or step == total_steps:
-                save_checkpoint(
-                    model,
-                    optimizer,
-                    scheduler,
-                    step,
-                    save_dir=save_dir,
-                    filename=f"checkpoint_step_{step}.pt",
-                )
-
-            # if verbose and step % 100 == 0:
+        if verbose and rank == 0 and (local_step % 100 == 0):
+            current_lr = scheduler.get_lr()[0]
             print(
-                f"Step {step}/{total_steps}, Loss: {loss.item()}, LR: {scheduler.get_lr()[0]:.6f}"
+                f"[Rank {rank}] Step {local_step}/{total_steps}, "
+                f"Loss: {loss.item():.4f}, LR: {current_lr:.6f}"
             )
 
-    save_checkpoint(
-        model,
-        optimizer,
-        scheduler,
-        step,
-        save_dir=save_dir,
-        filename=f"checkpoint_step_{step}.pt",
-    )
+        if (rank == 0) and ((local_step % save_interval == 0) or (local_step == total_steps)):
+            save_checkpoint(
+                model,
+                optimizer,
+                scheduler,
+                local_step,
+                save_dir=save_dir,
+                filename=f"checkpoint_step_{local_step}.pt",
+            )
 
-    avg_loss = epoch_loss / total_steps
-    return avg_loss
+        if local_step >= total_steps:
+            break
 
+    return local_step, epoch_loss
 
-if __name__ == "__main__":
+def main():
+    world_size = int(os.environ["WORLD_SIZE"])
+    rank = int(os.environ["RANK"])
+
+    dist.init_process_group(backend="nccl", init_method="env://", world_size=world_size, rank=rank)
+    torch.cuda.set_device(rank)
+    device = torch.device("cuda", rank)
+
     vocab = load_vocab("../data/vocab.ende")
-    dataset = TranslationDataset("../data/translate_ende_small.parquet")
-
-    batch_tokens = 100
-    dataloader = DataLoader(
-        dataset,
-        batch_sampler=TokenSumBatchSampler(dataset, max_tokens=batch_tokens),
-        collate_fn=collate_fn,
-    )
-
-    src_vocab_size = len(vocab[0])
-    tgt_vocab_size = len(vocab[0])
+    src_vocab_size = len(vocab[0]) + 1
+    tgt_vocab_size = len(vocab[0]) + 1
     d_model = 512
     num_heads = 8
     num_layers = 6
@@ -145,16 +130,60 @@ if __name__ == "__main__":
         max_seq_length,
         dropout,
     )
+
+    model.to(device)
+    model = DDP(model, device_ids=[rank], output_device=rank)
+
     optimizer = optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9)
-
-    warmpup_steps = 4000
-    scheduler = AttentionIsAllYouNeedSchedule(
-        optimizer, d_model, warmup_steps=warmpup_steps
+    scheduler = AttentionIsAllYouNeedSchedule(optimizer, d_model, warmup_steps=4000)
+    dataset = TranslationDataset("../data/dataset.parquet", start_idx=len(vocab[0]))
+    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=16,
+        sampler=sampler,
+        collate_fn=collate_fn,
+        num_workers=8,
+        pin_memory=True
     )
 
-    criterion = torch.nn.CrossEntropyLoss(
-        ignore_index=0, label_smoothing=label_smoothing
-    )
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=0, label_smoothing=label_smoothing)
+    current_step = 0
 
-    total_steps = 300000
-    train(model, dataloader, optimizer, scheduler, criterion, total_steps)
+    # Train
+    total_steps = 100000
+    save_interval = 10000
+    save_dir = "checkpoints"
+
+    while current_step < total_steps:
+        sampler.set_epoch(current_step)  # reshuffle data each "epoch"
+        current_step, epoch_loss = train_one_epoch(
+            model=model,
+            dataloader=dataloader,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            criterion=criterion,
+            device=device,
+            current_step=current_step,
+            total_steps=total_steps,
+            save_interval=save_interval,
+            save_dir=save_dir,
+            rank=rank,
+            verbose=True
+        )
+
+    if rank == 0:
+        save_checkpoint(
+            model,
+            optimizer,
+            scheduler,
+            current_step,
+            save_dir=save_dir,
+            filename=f"checkpoint_step_{current_step}.pt",
+        )
+
+    dist.destroy_process_group()
+
+
+if __name__ == "__main__":
+    main()

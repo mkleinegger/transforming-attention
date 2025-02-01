@@ -1,9 +1,9 @@
 # **Transformer Implementations**
 
-This repository contains Transformer model implementations in **Rust, PyTorch, and JAX**, based on the paper **[Attention is All You Need](https://arxiv.org/pdf/1706.03762)**.
+This repository contains Transformer model implementations in **Rust and PyTorch**, based on the paper **[Attention is All You Need](https://arxiv.org/pdf/1706.03762)**. Furthermore, we provide code to reproduce results using the original **[Tensor2Tensor (T2T)](https://github.com/tensorflow/tensor2tensor.git)** implementation.
 
 ## **Dataset**
-o ensure consistent sentence embeddings across all implementations, we provide **tokenized translation datasets** in **Parquet format** and a **vocabulary file** (`vocab.ende`) in the `data/` directory. The dataset was generated using **[Tensor2Tensor (T2T)](https://github.com/tensorflow/tensor2tensor.git)**, the original implementation of the **Attention is All You Need** paper, with **subword tokenization** applied to the `translate_ende_wmt32k` dataset.
+To ensure consistent sentence embeddings across all implementations, we provide **tokenized translation datasets** in **Parquet format** and a **vocabulary file** (`vocab.ende`) in the `data/` directory. The dataset was generated using **[Tensor2Tensor (T2T)](https://github.com/tensorflow/tensor2tensor.git)**, the original implementation of the **Attention is All You Need** paper, with **subword tokenization** applied to the `translate_ende_wmt32k` dataset.
 
 Each dataset file contains sentence pairs, where:
 - **`inputs` (English sentence tokens)**  
@@ -33,6 +33,11 @@ shape: (45_782, 2)
 - `t2t/` - Transformer implementation from Tensor2Tensor.
 - `data/` - Tokenized datasets and vocabulary file.
 - `examples/` - Example scripts.
+
+## **Running**
+Use `create_env.sh` to create an environment. After activating it, the code should run with just `python script.py`. If you want to use multi-gpu just run it with `torchrun torchrun --nproc-per-node=num_nodes train.py` and `torchrun torchrun --nproc-per-node=num_nodes predict.py`
+
+After training and predicting just use `bleu.py` to compute the result. Before running just check that you load the right checkpoints for each file, before each step.
 
 ## **References**
 - **[Attention is All You Need](https://arxiv.org/pdf/1706.03762)**
