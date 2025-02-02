@@ -1,14 +1,14 @@
-use candle_core::{DType, Device, Tensor, IndexOp};
-use candle_nn::VarBuilder;
-use ta::transformer::Transformer;
-use ta::config::Config;
-use ta::data::TranslationDataset;
-use polars::prelude::*;
-use std::path::PathBuf;
 use anyhow::Result;
+use candle_core::{DType, Device, IndexOp, Tensor};
+use candle_nn::VarBuilder;
 use clap::builder::ValueParser;
 use clap::{value_parser, Arg};
+use polars::prelude::*;
 use std::fs::File;
+use std::path::PathBuf;
+use ta::config::Config;
+use ta::data::{TranslationDataset, Vocabulary};
+use ta::transformer::Transformer;
 
 fn main() -> Result<()> {
     let device = Device::cuda_if_available(0)?;
@@ -17,33 +17,42 @@ fn main() -> Result<()> {
     let config = Config::default();
 
     let matches = clap::Command::new("predict")
-    .about("Inference on bilingual candle transformer")
-    .bin_name("predict")
-    .styles(Default::default())
-    .arg_required_else_help(true)
-    .arg(
-        Arg::new("data")
-            .value_name("FILE")
-            .help("Parquet dataset containing source and target tokens.")
-            .short('d')
-            .long("data")
-            .required(true)
-            .value_parser(value_parser!(PathBuf)),
-    )
-    .arg(
-        Arg::new("model")
-            .value_name("FILE")
-            .help("Path to the models weights")
-            .short('m')
-            .long("model")
-            .required(true)
-            .value_parser(ValueParser::path_buf()),
-    )
-    .get_matches();
+        .about("Inference on bilingual candle transformer")
+        .bin_name("predict")
+        .styles(Default::default())
+        .arg_required_else_help(true)
+        .arg(
+            Arg::new("data")
+                .value_name("FILE")
+                .help("Parquet dataset containing source and target tokens.")
+                .short('d')
+                .long("data")
+                .required(true)
+                .value_parser(value_parser!(PathBuf)),
+        )
+        .arg(
+            Arg::new("model")
+                .value_name("FILE")
+                .help("Path to the models weights")
+                .short('m')
+                .long("model")
+                .required(true)
+                .value_parser(ValueParser::path_buf()),
+        )
+        .arg(
+            Arg::new("vocab")
+                .value_name("FILE")
+                .help("Path to the Vocabulary")
+                .short('d')
+                .long("vocab")
+                .required(true)
+                .value_parser(ValueParser::path_buf()),
+        )
+        .get_matches();
 
     let data_file = matches.get_one::<PathBuf>("data").unwrap();
     let model_file = matches.get_one::<PathBuf>("model").unwrap();
-
+    let vocab_file = matches.get_one::<PathBuf>("vocab").unwrap();
 
     // load weights
     let loaded = candle_core::safetensors::load(model_file, &device)?;
@@ -82,10 +91,14 @@ fn main() -> Result<()> {
         let max_seq_len = 512;
 
         for _ in 0..max_length {
-            let predictions = transformer.forward(&input_tensor, &next_token, true, false, false)?;
+            let predictions =
+                transformer.forward(&input_tensor, &next_token, true, false, false)?;
             let last_token_logits = predictions.i((0, predictions.dim(1)? - 1))?;
 
-            let next_token_id = last_token_logits.argmax(0)?.to_dtype(candle_core::DType::I64)?.to_scalar::<i64>()?;
+            let next_token_id = last_token_logits
+                .argmax(0)?
+                .to_dtype(candle_core::DType::I64)?
+                .to_scalar::<i64>()?;
 
             output_tokens.push(next_token_id);
 
@@ -100,13 +113,22 @@ fn main() -> Result<()> {
 
             // Ensure `input_tensor` does not exceed `max_seq_len`
             if input_tensor.dim(1)? > max_seq_len {
-                input_tensor = input_tensor.narrow(1, input_tensor.dim(1)? - max_seq_len, max_seq_len)?;
+                input_tensor =
+                    input_tensor.narrow(1, input_tensor.dim(1)? - max_seq_len, max_seq_len)?;
             }
         }
 
         generated_data.push(output_tokens);
     }
 
+    let vocabulary = Vocabulary::new(vocab_file.to_str().unwrap());
+    let decoded: Vec<String> = generated_data
+        .iter()
+        .map(|v| v.iter().map(|i| *i as usize).collect::<Vec<usize>>())
+        .map(|v| vocabulary.decode(v).unwrap())
+        .collect();
+
+    println!("Decoded: \n{}", decoded.join("\n"));
     // let generated_series: Series = generated_data
     //     .iter()
     //     .map(|v| Series::new("", v.clone()))
@@ -129,7 +151,6 @@ fn main() -> Result<()> {
     // ParquetWriter::new(file)
     //     .with_compression(ParquetCompression::Zstd(None))
     //     .finish(&mut df)?;
-
 
     Ok(())
 }

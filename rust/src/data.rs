@@ -166,7 +166,7 @@ impl TranslationDataset {
         let device = Device::Cpu;
         let data = LazyFrame::scan_parquet(path, Default::default())?.collect()?;
 
-        // let data = data.head(Some(100));
+        let data = data.head(Some(100));
 
         fn to_tensor(
             data: &DataFrame,
@@ -365,7 +365,7 @@ impl Vocabulary {
             .lines()
             .map(|l| {
                 let l = l.expect("Could not parse line");
-                l.as_str()[1..l.len() - 1].into()  // cut `'` characters
+                l.as_str()[1..l.len() - 1].into() // cut `'` characters
             })
             .collect::<Vec<String>>();
 
@@ -381,8 +381,13 @@ impl Vocabulary {
         }
     }
 
-    pub fn decode(token_idx: Vec<usize>) -> Result<String> {
-        todo!("Implement vocab decoding");
+    pub fn decode(&self, token_idx: Vec<usize>) -> Result<String> {
+        let tokens: Vec<_> = token_idx
+            .iter()
+            .map(|t| self.idx2token.get(*t).unwrap().to_string())
+            .collect();
+        let joined: String = tokens.join(" ").into();
+        Ok(joined)
     }
 }
 
@@ -393,12 +398,25 @@ mod tests {
 
     #[test]
     fn test_vocab_loading() -> anyhow::Result<()> {
-        let path = "/home/lukas/Programming/uni/transforming-attention/data/vocab.ende";
+        let path = "../data/vocab.ende";
         let vocabulary = Vocabulary::new(path);
 
         // println!("Token2idx: {:?}", vocabulary.token2idx);
         println!("Ki: {:?}", vocabulary.token2idx.get("Ki").unwrap());
         // println!("idx2token: {:?}", vocabulary.idx2token);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_vec() -> anyhow::Result<()> {
+        let path = "../data/vocab.ende";
+        let vocabulary = Vocabulary::new(path);
+        let tokens = vec![1, 2, 3, 4, 5, 6, 300, 300, 300];
+
+        let decoded = vocabulary.decode(tokens)?;
+
+        println!("Decoded: {}", decoded);
 
         Ok(())
     }
