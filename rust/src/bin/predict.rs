@@ -48,16 +48,16 @@ fn main() -> Result<()> {
     // load weights
     let loaded = candle_core::safetensors::load(model_file, &device)?;
     let vb = VarBuilder::from_tensors(loaded.clone(), DType::F32, &device);
-    println!("vb: {:?}", vb.get((33709, 512), "encode_embeddings"));
+    // println!("vb: {:?}", vb.get((33709, 512), "encode_embeddings"));
 
-    // oad transformer
+    // load transformer
     let mut transformer = Transformer::new(vb, &config, 33709)?;
 
     // load dataset
     let dataset = TranslationDataset::new(data_file, config.max_seq_len)?;
 
-    let src = dataset.src.iter().cloned().collect::<Vec<_>>();
-    let tgt = dataset.tgt.iter().cloned().collect::<Vec<_>>();
+    let src = dataset.src.to_vec();
+    let tgt = dataset.tgt.to_vec();
 
     let mut generated_data: Vec<Vec<i64>> = Vec::new();
     let mut target_data: Vec<Vec<i64>> = Vec::new();
@@ -106,7 +106,6 @@ fn main() -> Result<()> {
 
         generated_data.push(output_tokens);
     }
-
 
     // let generated_series: Series = generated_data
     //     .iter()

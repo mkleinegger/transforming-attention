@@ -1,7 +1,12 @@
-use std::path::PathBuf;
 use candle_core::{Device, Result, Tensor};
 use candle_hf_hub::api::sync::Api;
 use polars::prelude::*;
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::PathBuf,
+};
 use tokenizers::Tokenizer;
 
 pub struct HuggingfaceDataset {
@@ -339,7 +344,7 @@ impl Iterator for BatchSampler {
         if batch.len() < self.max_tokens {
             self.curr = self.dataset.len()
         }
-        if batch.len() > 0 {
+        if !batch.is_empty() {
             return Some(batch);
         }
         self.curr = 0; // Iterator finished, do cleanup
@@ -347,14 +352,54 @@ impl Iterator for BatchSampler {
     }
 }
 
-// struct Vocabulary {
-//     pub idx2token: Vec<String>,
-//     pub token2idx: HashMap<String, usize>,
-// }
-//
-// impl Vocabulary {
-//     pub fn new(path: &str) {
-//         // TODO: implement Vocabulary
-//         todo!("implement vocabulary")
-//     }
-// }
+pub struct Vocabulary {
+    pub idx2token: Vec<String>,
+    pub token2idx: HashMap<String, usize>,
+}
+
+impl Vocabulary {
+    pub fn new(vocab_path: &str) -> Self {
+        let file = File::open(vocab_path).expect("Vocab file does not exist");
+        let buf = BufReader::new(file);
+        let idx2token = buf
+            .lines()
+            .map(|l| {
+                let l = l.expect("Could not parse line");
+                l.as_str()[1..l.len() - 1].into()  // cut `'` characters
+            })
+            .collect::<Vec<String>>();
+
+        let token2idx: HashMap<String, usize> = idx2token
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (t.clone(), i))
+            .collect();
+
+        Vocabulary {
+            idx2token,
+            token2idx,
+        }
+    }
+
+    pub fn decode(token_idx: Vec<usize>) -> Result<String> {
+        todo!("Implement vocab decoding");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_vocab_loading() -> anyhow::Result<()> {
+        let path = "/home/lukas/Programming/uni/transforming-attention/data/vocab.ende";
+        let vocabulary = Vocabulary::new(path);
+
+        // println!("Token2idx: {:?}", vocabulary.token2idx);
+        println!("Ki: {:?}", vocabulary.token2idx.get("Ki").unwrap());
+        // println!("idx2token: {:?}", vocabulary.idx2token);
+
+        Ok(())
+    }
+}
