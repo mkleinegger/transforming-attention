@@ -382,11 +382,12 @@ impl Vocabulary {
     }
 
     pub fn decode(&self, token_idx: Vec<usize>) -> Result<String> {
+        let default = "na".to_string();
         let tokens: Vec<_> = token_idx
             .iter()
-            .map(|t| self.idx2token.get(*t).unwrap().to_string())
+            .map(|t| self.idx2token.get(*t).unwrap_or(&default).to_string())
             .collect();
-        let joined: String = tokens.join(" ").into();
+        let joined: String = tokens.join(" ");
         Ok(joined)
     }
 }

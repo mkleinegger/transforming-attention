@@ -160,7 +160,7 @@ fn main() -> Result<()> {
         let filtered: Vec<_> = vec
             .iter()
             .enumerate()
-            .filter(|(_i, index)| **index == (padding_token as i64))
+            .filter(|(_i, index)| **index != (padding_token as i64))
             .map(|(i, _index)| i as u32)
             .collect();
 

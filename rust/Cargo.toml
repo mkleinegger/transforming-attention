@@ -36,3 +36,7 @@ path = "src/bin/manual.rs"
 [[bin]]
 name = "train"
 path = "src/bin/train.rs"
+
+[[bin]]
+name = "predict"
+path = "src/bin/predict.rs"

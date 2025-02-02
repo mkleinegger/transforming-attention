@@ -43,7 +43,7 @@ fn main() -> Result<()> {
             Arg::new("vocab")
                 .value_name("FILE")
                 .help("Path to the Vocabulary")
-                .short('d')
+                .short('t')
                 .long("vocab")
                 .required(true)
                 .value_parser(ValueParser::path_buf()),
