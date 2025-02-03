@@ -2,7 +2,7 @@ use crate::{
     attention::multihead::MultiHeadAttentionBlock, config::Config, feed_forward::FeedForwardBlock,
     normalization::NormalizationLayer,
 };
-use candle_core::{Result, Tensor};
+use candle_core::{Device, Result, Tensor};
 use candle_nn::Dropout;
 
 pub struct ResidualConnection {
@@ -16,10 +16,10 @@ pub enum SubLayer<'a> {
 }
 
 impl ResidualConnection {
-    pub fn new(config: &Config) -> Result<Self> {
+    pub fn new(config: &Config, device: &Device) -> Result<Self> {
         Ok(Self {
             dropout: Dropout::new(config.residual_dropout),
-            norm: NormalizationLayer::new(config)?,
+            norm: NormalizationLayer::new(config, device)?,
         })
     }
 

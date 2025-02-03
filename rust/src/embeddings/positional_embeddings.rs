@@ -108,7 +108,7 @@ mod tests {
         println!("Token Ids: {}", token_ids_batch);
 
         let input_embeds = InputEmbeddings::new(vocab_size, &config, vb)?;
-        let embeddings = input_embeds.forward(&token_ids_batch)?;
+        let embeddings = input_embeds.forward(&token_ids_batch, false)?;
         println!("vector embeddings: \n{}\n", embeddings);
         let mut pe = PositionalEmbeddings::new(&config, &device)?;
         println!("pos_embeddings main: \n{}\n", pe.positional_embeddings);

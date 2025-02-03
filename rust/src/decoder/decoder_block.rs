@@ -17,7 +17,7 @@ impl DecoderBlock {
     pub fn new(config: &Config, vb: VarBuilder) -> Result<Self> {
         let mut residual_connections = Vec::with_capacity(2);
         for _ in 0..3 {
-            residual_connections.push(ResidualConnection::new(config)?);
+            residual_connections.push(ResidualConnection::new(config, vb.device())?);
         }
 
         Ok(Self {

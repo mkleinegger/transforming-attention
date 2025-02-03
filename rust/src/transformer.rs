@@ -97,7 +97,6 @@ impl Transformer {
         tgt_mask: Option<&Tensor>,
         train: bool,
     ) -> Result<Tensor> {
-        // TODO: dropout in embeddings
         let embedded = self.decode_embeddings.forward(indices, train)?;
         let embedded = self.decode_positional.forward(embedded, train)?;
 

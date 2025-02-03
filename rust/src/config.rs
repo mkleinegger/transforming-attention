@@ -21,6 +21,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         let device = Device::cuda_if_available(0).unwrap();
+        // let device = Device::Cpu;
 
         Self {
             n_encoders: 6,
@@ -29,12 +30,12 @@ impl Default for Config {
             d_model: 512,
             d_feed_forward: 2048,
             device,
-            attention_dropout: 0.3,
-            embedding_dropout: 0.3,
-            pos_dropout: 0.3,
-            residual_dropout: 0.3,
-            feed_forward_dropout: 0.3,
-            batch_size: 16,
+            attention_dropout: 0.1,
+            embedding_dropout: 0.0,
+            pos_dropout: 0.1,
+            residual_dropout: 0.1,
+            feed_forward_dropout: 0.1,
+            batch_size: 8,
             max_seq_len: 256,
             max_steps: 100_000,
             log_x_steps: 1_000,
