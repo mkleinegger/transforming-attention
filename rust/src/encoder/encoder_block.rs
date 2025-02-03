@@ -18,7 +18,7 @@ impl EncoderBlock {
     pub fn new(vb: VarBuilder, config: &Config) -> Result<Self> {
         let mut residual_connections = Vec::with_capacity(2);
         for _ in 0..2 {
-            residual_connections.push(ResidualConnection::new(config)?)
+            residual_connections.push(ResidualConnection::new(config, vb.device())?)
         }
 
         Ok(Self {

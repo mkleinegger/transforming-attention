@@ -387,7 +387,7 @@ impl Vocabulary {
             .iter()
             .map(|t| self.idx2token.get(*t).unwrap_or(&default).to_string())
             .collect();
-        let joined: String = tokens.join(" ");
+        let joined: String = tokens.join("").replace("_", " ");
         Ok(joined)
     }
 }

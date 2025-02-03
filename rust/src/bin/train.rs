@@ -56,7 +56,7 @@ fn main() -> Result<()> {
 
     info!("Using GPU: {:?}", !device.is_cpu());
 
-    let mut varmap = VarMap::new();
+    let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
 
     let dataset = TranslationDataset::new(train_file, config.max_seq_len).unwrap();
@@ -154,8 +154,6 @@ fn main() -> Result<()> {
         target: &Tensor,
         padding_token: usize,
     ) -> Result<Tensor> {
-        // TODO: filter padding tokens
-
         let vec: Vec<i64> = target.to_vec1()?;
         let filtered: Vec<_> = vec
             .iter()

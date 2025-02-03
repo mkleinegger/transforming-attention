@@ -3,15 +3,18 @@ use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::VarBuilder;
 use clap::builder::ValueParser;
 use clap::{value_parser, Arg};
+use core::num;
 use polars::prelude::*;
 use std::fs::File;
 use std::path::PathBuf;
 use ta::config::Config;
 use ta::data::{TranslationDataset, Vocabulary};
 use ta::transformer::Transformer;
+use ta::util::predict_next_token;
 
 fn main() -> Result<()> {
     let device = Device::cuda_if_available(0)?;
+    // let device = Device::Cpu;
     println!("Using device: {:?}", device);
 
     let config = Config::default();
@@ -71,7 +74,8 @@ fn main() -> Result<()> {
     let mut generated_data: Vec<Vec<i64>> = Vec::new();
     let mut target_data: Vec<Vec<i64>> = Vec::new();
 
-    let num_samples = 10;
+    let num_samples = 50;
+    let num_skip = 50;
     println!("Starting inference on {} samples...", num_samples);
 
     for (i, input_tensor) in src.iter().take(num_samples).enumerate() {
@@ -83,22 +87,20 @@ fn main() -> Result<()> {
         target_data.push(target_tensor.to_vec1()?);
 
         let max_length = 50;
-        let eos_token_id = 33708; // eos
+        let eos_token_id = 1; // eos
+        let sos_token_id = 33708;
 
         // start decoding
-        let mut output_tokens = vec![eos_token_id];
+        let mut output_tokens = vec![sos_token_id];
         let mut next_token = Tensor::from_vec(output_tokens.clone(), (1, 1), &device)?;
         let max_seq_len = 512;
 
         for _ in 0..max_length {
-            let predictions =
-                transformer.forward(&input_tensor, &next_token, true, false, false)?;
+            let predictions = transformer.forward(&input_tensor, &next_token, true, true, false)?;
             let last_token_logits = predictions.i((0, predictions.dim(1)? - 1))?;
 
-            let next_token_id = last_token_logits
-                .argmax(0)?
-                .to_dtype(candle_core::DType::I64)?
-                .to_scalar::<i64>()?;
+            let next_predictions = predict_next_token(&last_token_logits, &output_tokens);
+            let next_token_id = *next_predictions?.first().unwrap();
 
             output_tokens.push(next_token_id);
 
@@ -108,7 +110,6 @@ fn main() -> Result<()> {
 
             // Append new token to the input sequence
             next_token = Tensor::from_vec(vec![next_token_id], (1, 1), &device)?;
-
             input_tensor = Tensor::cat(&[&input_tensor, &next_token], 1)?;
 
             // Ensure `input_tensor` does not exceed `max_seq_len`
@@ -125,10 +126,35 @@ fn main() -> Result<()> {
     let decoded: Vec<String> = generated_data
         .iter()
         .map(|v| v.iter().map(|i| *i as usize).collect::<Vec<usize>>())
+        .map(|v| vocabulary.decode(v[1..v.len()-1].to_vec()).unwrap())
+        .collect();
+
+    let target_decoded: Vec<String> = target_data
+        .iter()
+        // .skip(num_skip)
+        .map(|v| v.iter().map(|i| *i as usize).collect::<Vec<usize>>())
         .map(|v| vocabulary.decode(v).unwrap())
         .collect();
 
-    println!("Decoded: \n{}", decoded.join("\n"));
+    let src_decoded: Vec<String> = src
+        .iter()
+        // .skip(num_skip)
+        .map(|t| t.to_vec1::<i64>().unwrap())
+        .map(|v| v.iter().map(|u| *u as usize).collect())
+        .map(|s| vocabulary.decode(s).unwrap())
+        .collect::<Vec<String>>();
+
+    let combined = decoded
+        .iter()
+        .zip(target_decoded.iter())
+        .zip(src_decoded.iter())
+        .map(|((p, t), s)| (p, t, s))
+        .map(|(p, t, s)| format!("Source: {}\nPrediction: {}\nOriginal: {}", s, p, t))
+        .for_each(|s| println!("{s}\n"));
+
+    println!("{:?}", combined);
+
+    // println!("Source: \n{}", decoded.join("\n"));
     // let generated_series: Series = generated_data
     //     .iter()
     //     .map(|v| Series::new("", v.clone()))

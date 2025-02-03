@@ -11,7 +11,7 @@ pub struct Encoder {
 
 impl Encoder {
     pub fn new(vb: VarBuilder, config: &Config) -> Result<Self> {
-        let norm = NormalizationLayer::new(config)?;
+        let norm = NormalizationLayer::new(config, vb.device())?;
         let layers = (0..config.n_encoders)
             .map(|index| EncoderBlock::new(vb.pp(format!("{index}")), config))
             .collect::<Result<Vec<_>>>()?;

@@ -17,7 +17,7 @@ impl Decoder {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
-            norm: NormalizationLayer::new(config)?,
+            norm: NormalizationLayer::new(config, vb.device())?,
             layers,
         })
     }
