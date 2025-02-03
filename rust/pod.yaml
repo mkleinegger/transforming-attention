@@ -1,0 +1,19 @@
+# curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# apt install  pkg-config libssl-dev
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rust
+  labels:
+    app: rust
+spec:
+  nodeSelector:
+    capi.stackhpc.com/node-group: gpu-workers-t4
+  containers:
+  - name: rust
+    image: nvidia/cuda:12.3.0-devel-ubuntu22.04
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    command: ["bash"]
+    args: ["-c", "sleep infinity"]
